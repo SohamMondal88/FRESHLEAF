@@ -1,11 +1,111 @@
-import React from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Package, ChevronRight, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Package, ChevronRight, Clock, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { useOrder } from '../services/OrderContext';
 import { useAuth } from '../services/AuthContext';
 
+const OrderItem = ({ order, cancelOrder }: { order: any, cancelOrder: any }) => {
+  const [timeLeft, setTimeLeft] = useState(0);
+
+  const formatPrice = (price: number) =>
+    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(price);
+
+  useEffect(() => {
+    if (order.status !== 'Processing') return;
+    
+    const calculateTimeLeft = () => {
+      const created = order.timestamp;
+      const now = Date.now();
+      const diff = 5 * 60 * 1000 - (now - created);
+      return Math.max(0, diff);
+    };
+
+    setTimeLeft(calculateTimeLeft());
+    const timer = setInterval(() => {
+      const remaining = calculateTimeLeft();
+      setTimeLeft(remaining);
+      if (remaining <= 0) clearInterval(timer);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [order]);
+
+  const minutes = Math.floor(timeLeft / 60000);
+  const seconds = Math.floor((timeLeft % 60000) / 1000);
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:border-leaf-300 transition">
+      <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <span className="text-xs text-gray-500 uppercase tracking-wide font-bold">Order Placed</span>
+          <p className="text-gray-900 font-medium">{order.date}</p>
+        </div>
+        <div>
+          <span className="text-xs text-gray-500 uppercase tracking-wide font-bold">Total</span>
+          <p className="text-gray-900 font-medium">{formatPrice(order.total)}</p>
+        </div>
+        <div>
+          <span className="text-xs text-gray-500 uppercase tracking-wide font-bold">Order #</span>
+          <p className="text-gray-900 font-medium">{order.id}</p>
+        </div>
+        <div className="sm:ml-auto flex gap-2">
+           <Link to={`/track-order/${order.id}`} className="bg-leaf-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-leaf-700 transition flex items-center gap-2">
+             Track Order <ChevronRight size={16} />
+           </Link>
+        </div>
+      </div>
+      
+      <div className="p-6">
+        <div className="flex flex-wrap justify-between items-center gap-4 mb-4">
+          <div className="flex items-center gap-2">
+            {order.status === 'Delivered' ? (
+              <CheckCircle className="text-green-600" size={20} />
+            ) : order.status === 'Cancelled' ? (
+              <XCircle className="text-red-500" size={20} />
+            ) : (
+              <Clock className="text-orange-500" size={20} />
+            )}
+            <span className={`font-bold ${order.status === 'Delivered' ? 'text-green-600' : order.status === 'Cancelled' ? 'text-red-500' : 'text-orange-500'}`}>
+              {order.status}
+            </span>
+          </div>
+
+          {order.status === 'Processing' && timeLeft > 0 && (
+            <div className="flex items-center gap-2">
+               <span className="text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded">
+                 Cancel available for {minutes}:{seconds < 10 ? `0${seconds}` : seconds}
+               </span>
+               <button 
+                onClick={() => cancelOrder(order.id)}
+                className="bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 px-3 py-1.5 rounded-lg text-xs font-bold transition"
+               >
+                 Cancel Order
+               </button>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-6">
+          <div className="flex-grow space-y-3">
+            {order.items.map((item: any, idx: number) => (
+              <div key={idx} className="flex items-center gap-4">
+                <img src={item.image} alt={item.name.en} className="w-12 h-12 rounded-lg object-cover bg-gray-100" />
+                <div>
+                  <p className="font-medium text-gray-800 text-sm">{item.name.en}</p>
+                  <p className="text-xs text-gray-500">Qty: {item.quantity} × {formatPrice(item.price)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const Orders: React.FC = () => {
-  const { orders } = useOrder();
+  const { orders, cancelOrder } = useOrder();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -13,9 +113,6 @@ export const Orders: React.FC = () => {
     navigate('/login');
     return null;
   }
-
-  const formatPrice = (price: number) =>
-    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(price);
 
   return (
     <div className="bg-gray-50 min-h-screen py-10">
@@ -35,56 +132,7 @@ export const Orders: React.FC = () => {
         ) : (
           <div className="space-y-4">
             {orders.map((order) => (
-              <div key={order.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:border-leaf-300 transition">
-                <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div>
-                    <span className="text-xs text-gray-500 uppercase tracking-wide font-bold">Order Placed</span>
-                    <p className="text-gray-900 font-medium">{order.date}</p>
-                  </div>
-                  <div>
-                    <span className="text-xs text-gray-500 uppercase tracking-wide font-bold">Total</span>
-                    <p className="text-gray-900 font-medium">{formatPrice(order.total)}</p>
-                  </div>
-                  <div>
-                    <span className="text-xs text-gray-500 uppercase tracking-wide font-bold">Order #</span>
-                    <p className="text-gray-900 font-medium">{order.id}</p>
-                  </div>
-                  <div className="sm:ml-auto">
-                     <Link to={`/track-order/${order.id}`} className="bg-leaf-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-leaf-700 transition flex items-center gap-2">
-                       Track Order <ChevronRight size={16} />
-                     </Link>
-                  </div>
-                </div>
-                
-                <div className="p-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    {order.status === 'Delivered' ? (
-                      <CheckCircle className="text-green-600" size={20} />
-                    ) : order.status === 'Cancelled' ? (
-                      <XCircle className="text-red-500" size={20} />
-                    ) : (
-                      <Clock className="text-orange-500" size={20} />
-                    )}
-                    <span className={`font-bold ${order.status === 'Delivered' ? 'text-green-600' : order.status === 'Cancelled' ? 'text-red-500' : 'text-orange-500'}`}>
-                      {order.status}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-6">
-                    <div className="flex-grow space-y-3">
-                      {order.items.map((item, idx) => (
-                        <div key={idx} className="flex items-center gap-4">
-                          <img src={item.image} alt={item.name.en} className="w-12 h-12 rounded-lg object-cover bg-gray-100" />
-                          <div>
-                            <p className="font-medium text-gray-800 text-sm">{item.name.en}</p>
-                            <p className="text-xs text-gray-500">Qty: {item.quantity} × {formatPrice(item.price)}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <OrderItem key={order.id} order={order} cancelOrder={cancelOrder} />
             ))}
           </div>
         )}

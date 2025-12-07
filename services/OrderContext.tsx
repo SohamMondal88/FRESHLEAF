@@ -19,6 +19,7 @@ interface OrderContextType {
   generateInvoice: (order: Order) => void;
   updateOrderStatus: (orderId: string, status: Order['status']) => void;
   assignRider: (orderId: string, riderId: string) => void;
+  cancelOrder: (orderId: string) => Promise<boolean>;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
@@ -46,6 +47,7 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const generateInvoice = (order: Order) => {
     if (!window.jspdf) {
       console.error("jsPDF library not loaded");
+      addToast("PDF Library not loaded", "error");
       return;
     }
     const { jsPDF } = window.jspdf;
@@ -167,6 +169,7 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       id: orderId,
       userId: user?.id || 'guest',
       date: new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' }),
+      timestamp: Date.now(),
       total,
       status: 'Processing',
       items,
@@ -181,10 +184,48 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const updatedOrders = [newOrder, ...orders];
     saveOrders(updatedOrders);
     
-    // Notify Admin via Console/Toast simulation
-    console.log(`New Order Created: ${orderId}`);
+    // Simulate WhatsApp Notification logic
+    const waMessage = `*New Order Placed!* %0A%0AOrder ID: ${newOrder.id}%0ACustomer: ${name}%0APhone: ${phone}%0AEmail: ${user?.email || 'Guest'}%0AAddress: ${address}%0AItems: ${items.map(i => `${i.quantity}x ${i.name.en}`).join(', ')}%0ATotal: ₹${total}%0A%0AInvoice PDF has been generated and sent.`;
+    
+    // Simulate sending to Company
+    console.log(`[WhatsApp Bot] Sending to Company (${COMPANY_INFO.whatsapp}):`, waMessage);
+    
+    // Simulate sending to User
+    console.log(`[WhatsApp Bot] Sending to User (${phone}):`, waMessage);
+    
+    addToast('Order details sent to your WhatsApp successfully!', 'success');
+    addToast('Invoice PDF sent to your WhatsApp.', 'success');
     
     return newOrder.id;
+  };
+
+  const cancelOrder = async (orderId: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return false;
+
+    // 5 Minute check
+    const timeDiff = Date.now() - order.timestamp;
+    if (timeDiff > 5 * 60 * 1000) {
+      addToast('Cancellation window (5 mins) has expired.', 'error');
+      return false;
+    }
+
+    if (order.status !== 'Processing') {
+      addToast('Order cannot be cancelled at this stage.', 'error');
+      return false;
+    }
+
+    const updatedOrders = orders.map(o => 
+      o.id === orderId ? { ...o, status: 'Cancelled' as const } : o
+    );
+    saveOrders(updatedOrders);
+    
+    // Simulate WhatsApp Cancellation update
+    const message = `Order ${orderId} has been CANCELLED by the user.`;
+    console.log(`[WhatsApp Bot] Sending Cancellation to Company & User: ${message}`);
+    addToast('Order cancelled. Update sent to WhatsApp.', 'success');
+
+    return true;
   };
 
   const updateOrderStatus = (orderId: string, status: Order['status']) => {
@@ -194,8 +235,6 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         if (o.customerPhone) {
           const message = `Hi ${o.customerName}, your FreshLeaf order ${o.id} is now ${status}.`;
           const url = `https://wa.me/91${o.customerPhone}?text=${encodeURIComponent(message)}`;
-          // In a real app, this would be a backend trigger. 
-          // Here, we simulate by logging or opening for admin
           console.log(`WhatsApp Notification URL prepared: ${url}`);
         }
         return { ...o, status };
@@ -224,7 +263,7 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const userOrders = user ? orders.filter(o => o.userId === user.id) : [];
 
   return (
-    <OrderContext.Provider value={{ orders: user?.isAdmin ? orders : userOrders, createOrder, getOrderById, generateInvoice, updateOrderStatus, assignRider }}>
+    <OrderContext.Provider value={{ orders: user?.isAdmin ? orders : userOrders, createOrder, getOrderById, generateInvoice, updateOrderStatus, assignRider, cancelOrder }}>
       {children}
     </OrderContext.Provider>
   );

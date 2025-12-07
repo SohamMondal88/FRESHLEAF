@@ -97,6 +97,7 @@ export interface Order {
   id: string;
   userId: string;
   date: string;
+  timestamp: number; // Added for cancellation timer
   total: number;
   status: 'Processing' | 'Packed' | 'Out for Delivery' | 'Delivered' | 'Cancelled';
   items: CartItem[];
