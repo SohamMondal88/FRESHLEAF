@@ -1,8 +1,9 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Order, CartItem } from '../types';
+import { Order, CartItem, Rider } from '../types';
 import { useAuth } from './AuthContext';
-import { COMPANY_INFO } from '../constants';
+import { COMPANY_INFO, RIDERS } from '../constants';
+import { useToast } from './ToastContext';
 
 // Declare jsPDF types for the window object
 declare global {
@@ -16,6 +17,8 @@ interface OrderContextType {
   createOrder: (items: CartItem[], total: number, address: string, paymentMethod: string, phone: string, name: string) => Promise<string>;
   getOrderById: (id: string) => Order | undefined;
   generateInvoice: (order: Order) => void;
+  updateOrderStatus: (orderId: string, status: Order['status']) => void;
+  assignRider: (orderId: string, riderId: string) => void;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
@@ -24,6 +27,7 @@ const DB_ORDERS_KEY = 'freshleaf_orders_db';
 
 export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
+  const { addToast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
 
   // Load orders from local storage
@@ -33,6 +37,11 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setOrders(JSON.parse(storedOrders));
     }
   }, []);
+
+  const saveOrders = (newOrders: Order[]) => {
+    setOrders(newOrders);
+    localStorage.setItem(DB_ORDERS_KEY, JSON.stringify(newOrders));
+  };
 
   const generateInvoice = (order: Order) => {
     if (!window.jspdf) {
@@ -86,7 +95,7 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     
     doc.text(`Order Date: ${order.date}`, 15, 92);
     doc.text(`Payment: ${order.paymentMethod}`, 80, 92);
-    doc.text(`Courier: Bombax Logistics`, 140, 92);
+    doc.text(`Courier: ${order.courier || 'Bombax Logistics'}`, 140, 92);
 
     // Items Table
     const tableColumn = ["Item", "Unit", "Qty", "Price", "Total"];
@@ -170,14 +179,42 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
 
     const updatedOrders = [newOrder, ...orders];
-    setOrders(updatedOrders);
+    saveOrders(updatedOrders);
     
-    // Store in global DB simulation
-    const dbOrders = JSON.parse(localStorage.getItem(DB_ORDERS_KEY) || '[]');
-    dbOrders.push(newOrder);
-    localStorage.setItem(DB_ORDERS_KEY, JSON.stringify(dbOrders));
+    // Notify Admin via Console/Toast simulation
+    console.log(`New Order Created: ${orderId}`);
     
     return newOrder.id;
+  };
+
+  const updateOrderStatus = (orderId: string, status: Order['status']) => {
+    const updatedOrders = orders.map(o => {
+      if (o.id === orderId) {
+        // Trigger WhatsApp Notification Simulation
+        if (o.customerPhone) {
+          const message = `Hi ${o.customerName}, your FreshLeaf order ${o.id} is now ${status}.`;
+          const url = `https://wa.me/91${o.customerPhone}?text=${encodeURIComponent(message)}`;
+          // In a real app, this would be a backend trigger. 
+          // Here, we simulate by logging or opening for admin
+          console.log(`WhatsApp Notification URL prepared: ${url}`);
+        }
+        return { ...o, status };
+      }
+      return o;
+    });
+    saveOrders(updatedOrders);
+    addToast(`Order ${orderId} status updated to ${status}`, 'success');
+  };
+
+  const assignRider = (orderId: string, riderId: string) => {
+    const rider = RIDERS.find(r => r.id === riderId);
+    if (!rider) return;
+
+    const updatedOrders = orders.map(o => 
+      o.id === orderId ? { ...o, riderId: rider.id, riderName: rider.name, courier: 'FreshLeaf Fleet' } : o
+    );
+    saveOrders(updatedOrders);
+    addToast(`Rider ${rider.name} assigned to order ${orderId}`, 'success');
   };
 
   const getOrderById = (id: string) => {
@@ -187,7 +224,7 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const userOrders = user ? orders.filter(o => o.userId === user.id) : [];
 
   return (
-    <OrderContext.Provider value={{ orders: userOrders, createOrder, getOrderById, generateInvoice }}>
+    <OrderContext.Provider value={{ orders: user?.isAdmin ? orders : userOrders, createOrder, getOrderById, generateInvoice, updateOrderStatus, assignRider }}>
       {children}
     </OrderContext.Provider>
   );

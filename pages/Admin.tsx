@@ -1,16 +1,21 @@
 
 import React, { useState } from 'react';
-import { BarChart3, Users, ShoppingBag, DollarSign, TrendingUp, Package, Bell, Search, Settings, Edit, Trash2, CheckCircle, XCircle, Truck, RefreshCw, Plus, Tag, Bike, List, User } from 'lucide-react';
+import { BarChart3, Users, ShoppingBag, DollarSign, Package, Bell, Edit, Trash2, RefreshCw, Plus, Tag, Bike, Truck, MessageCircle, X } from 'lucide-react';
 import { PRODUCTS, RIDERS, COUPONS } from '../constants';
 import { useOrder } from '../services/OrderContext';
 import { useAuth } from '../services/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { Order } from '../types';
 
 export const Admin: React.FC = () => {
   const { user } = useAuth();
-  const { orders } = useOrder();
+  const { orders, updateOrderStatus, assignRider } = useOrder();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'products' | 'users' | 'riders' | 'coupons'>('dashboard');
+  
+  // Modal State for assigning rider
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [showRiderModal, setShowRiderModal] = useState(false);
 
   if (!user || !user.isAdmin) {
     return (
@@ -26,6 +31,35 @@ export const Admin: React.FC = () => {
   const totalRevenue = orders.reduce((acc, order) => acc + order.total, 0);
   const totalOrders = orders.length;
   const pendingOrders = orders.filter(o => o.status === 'Processing').length;
+
+  const handleStatusChange = (orderId: string, e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newStatus = e.target.value as Order['status'];
+    updateOrderStatus(orderId, newStatus);
+  };
+
+  const handleAssignRiderClick = (order: Order) => {
+    setSelectedOrder(order);
+    setShowRiderModal(true);
+  };
+
+  const confirmRiderAssignment = (riderId: string) => {
+    if (selectedOrder) {
+      assignRider(selectedOrder.id, riderId);
+      updateOrderStatus(selectedOrder.id, 'Out for Delivery');
+      setShowRiderModal(false);
+      setSelectedOrder(null);
+    }
+  };
+
+  const sendWhatsAppUpdate = (order: Order) => {
+    if (order.customerPhone) {
+      const message = `Hello ${order.customerName}, your FreshLeaf order ${order.id} is currently ${order.status}. Rider: ${order.riderName || 'Assigned'}. Track here: https://freshleaf.in/track/${order.id}`;
+      const url = `https://wa.me/91${order.customerPhone}?text=${encodeURIComponent(message)}`;
+      window.open(url, '_blank');
+    } else {
+      alert('Customer phone number not available');
+    }
+  };
 
   const TabButton = ({ id, label, icon: Icon }: any) => (
     <button 
@@ -90,6 +124,7 @@ export const Admin: React.FC = () => {
               <th className="px-6 py-4">Order ID</th>
               <th className="px-6 py-4">Customer</th>
               <th className="px-6 py-4">Status</th>
+              <th className="px-6 py-4">Rider</th>
               <th className="px-6 py-4">Total</th>
               <th className="px-6 py-4 text-right">Actions</th>
             </tr>
@@ -100,21 +135,36 @@ export const Admin: React.FC = () => {
                 <td className="px-6 py-4 font-mono text-gray-500">{o.id}</td>
                 <td className="px-6 py-4"><p className="font-bold text-gray-900">{o.customerName || 'Guest'}</p><p className="text-xs text-gray-500">{o.date}</p></td>
                 <td className="px-6 py-4">
-                  <span className={`px-2 py-1 rounded text-xs font-bold flex items-center gap-1 w-fit
+                  <select 
+                    value={o.status} 
+                    onChange={(e) => handleStatusChange(o.id, e)}
+                    className={`px-2 py-1 rounded text-xs font-bold outline-none border-none cursor-pointer
                     ${o.status === 'Delivered' ? 'bg-green-100 text-green-700' : 
                       o.status === 'Processing' ? 'bg-yellow-100 text-yellow-700' :
-                      o.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
-                    {o.status}
-                  </span>
+                      o.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}
+                  >
+                    <option value="Processing">Processing</option>
+                    <option value="Packed">Packed</option>
+                    <option value="Out for Delivery">Out for Delivery</option>
+                    <option value="Delivered">Delivered</option>
+                    <option value="Cancelled">Cancelled</option>
+                  </select>
+                </td>
+                <td className="px-6 py-4">
+                  {o.riderName ? (
+                    <span className="flex items-center gap-1 text-xs font-bold text-gray-700">
+                      <Bike size={12}/> {o.riderName}
+                    </span>
+                  ) : (
+                    <button onClick={() => handleAssignRiderClick(o)} className="text-xs text-blue-600 hover:underline">Assign Rider</button>
+                  )}
                 </td>
                 <td className="px-6 py-4 font-bold">₹{o.total}</td>
-                <td className="px-6 py-4 text-right">
-                  <select className="bg-gray-50 border border-gray-200 text-xs rounded p-1 outline-none focus:border-leaf-500">
-                    <option>Action</option>
-                    <option>Mark Packed</option>
-                    <option>Assign Rider</option>
-                    <option>Complete</option>
-                  </select>
+                <td className="px-6 py-4 text-right flex justify-end gap-2">
+                  <button onClick={() => sendWhatsAppUpdate(o)} className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100" title="Send WhatsApp Update">
+                    <MessageCircle size={16} />
+                  </button>
+                  <button className="p-2 border rounded-lg hover:bg-gray-50" title="View Details"><Truck size={16} /></button>
                 </td>
               </tr>
             ))}
@@ -249,6 +299,38 @@ export const Admin: React.FC = () => {
         {activeTab === 'users' && <div className="animate-in fade-in bg-white p-10 rounded-xl shadow-sm text-center text-gray-500">User Management Module Placeholder</div>}
 
       </div>
+
+      {/* Rider Assignment Modal */}
+      {showRiderModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Assign Rider for Order #{selectedOrder?.id}</h3>
+              <button onClick={() => setShowRiderModal(false)}><X size={20} className="text-gray-500"/></button>
+            </div>
+            <div className="space-y-2 mb-6">
+              {RIDERS.map(rider => (
+                <button 
+                  key={rider.id}
+                  onClick={() => confirmRiderAssignment(rider.id)}
+                  disabled={rider.status !== 'Available'}
+                  className={`w-full flex items-center justify-between p-3 rounded-xl border transition ${rider.status === 'Available' ? 'hover:bg-blue-50 hover:border-blue-300' : 'opacity-50 cursor-not-allowed bg-gray-50'}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-600">{rider.name[0]}</div>
+                    <div className="text-left">
+                      <p className="font-bold text-sm">{rider.name}</p>
+                      <p className="text-xs text-gray-500">{rider.vehicle}</p>
+                    </div>
+                  </div>
+                  <span className={`text-xs font-bold px-2 py-1 rounded ${rider.status === 'Available' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>{rider.status}</span>
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setShowRiderModal(false)} className="w-full py-2 text-gray-500 font-bold hover:bg-gray-100 rounded-lg">Cancel</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

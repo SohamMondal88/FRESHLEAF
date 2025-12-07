@@ -60,6 +60,14 @@ export interface UserNotification {
   type: 'order' | 'promo' | 'system';
 }
 
+export interface SupportTicket {
+  id: string;
+  subject: string;
+  status: 'Open' | 'In Progress' | 'Resolved';
+  date: string;
+  lastUpdate: string;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -74,6 +82,7 @@ export interface User {
   walletBalance?: number;
   savedCards?: SavedCard[];
   notifications?: UserNotification[];
+  tickets?: SupportTicket[];
 }
 
 export interface DeliverySlot {
@@ -98,6 +107,7 @@ export interface Order {
   customerName?: string;
   customerPhone?: string;
   deliverySlot?: string;
+  riderId?: string; // ID of the assigned rider
   riderName?: string;
 }
 

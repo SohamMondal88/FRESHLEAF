@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { 
   Package, Settings, MapPin, CreditCard, Bell, Heart, LogOut, 
   Crown, ChevronRight, User, Camera, Plus, Trash2, Home, 
-  TrendingUp, DollarSign, Calendar, FileText, Edit2, X, Check
+  TrendingUp, DollarSign, Calendar, FileText, Edit2, X, Check, HelpCircle, MessageSquare
 } from 'lucide-react';
 import { useAuth } from '../services/AuthContext';
 import { useOrder } from '../services/OrderContext';
@@ -313,6 +313,25 @@ export const Account: React.FC = () => {
     </div>
   );
 
+  const SupportView = () => (
+    <div className="space-y-6 animate-in fade-in duration-500">
+        <div className="flex justify-between items-center">
+            <h3 className="text-xl font-bold text-gray-900">Support Tickets</h3>
+            <button className="bg-leaf-600 text-white px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-leaf-700 transition">
+            <Plus size={16} /> New Ticket
+            </button>
+        </div>
+        
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-6 text-center text-gray-500">
+                <MessageSquare size={48} className="mx-auto text-gray-300 mb-4" />
+                <p>No active support tickets.</p>
+                <p className="text-xs">Need help? Create a ticket and we'll respond within 24h.</p>
+            </div>
+        </div>
+    </div>
+  );
+
   return (
     <div className="bg-gray-50 min-h-screen py-10">
       <div className="container mx-auto px-4 max-w-7xl">
@@ -353,6 +372,7 @@ export const Account: React.FC = () => {
                 { id: 'orders', label: 'My Orders', icon: Package },
                 { id: 'addresses', label: 'Addresses', icon: MapPin },
                 { id: 'wallet', label: 'Wallet & Payments', icon: CreditCard },
+                { id: 'support', label: 'Support Tickets', icon: HelpCircle },
                 { id: 'settings', label: 'Account Settings', icon: Settings },
               ].map(item => (
                 <button
@@ -382,6 +402,7 @@ export const Account: React.FC = () => {
              {activeTab === 'dashboard' && <DashboardView />}
              {activeTab === 'addresses' && <AddressesView />}
              {activeTab === 'wallet' && <WalletView />}
+             {activeTab === 'support' && <SupportView />}
           </div>
         </div>
       </div>

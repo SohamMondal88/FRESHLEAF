@@ -140,6 +140,39 @@ export const ProductDetails: React.FC = () => {
           </div>
         </div>
 
+        {/* Reviews Section */}
+        <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-8 md:p-12 mb-12">
+            <h3 className="text-2xl font-bold text-gray-900 mb-6">Customer Reviews</h3>
+            <div className="space-y-6">
+                <div className="border-b border-gray-100 pb-6">
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="flex text-yellow-400">
+                            {[...Array(5)].map((_, i) => (
+                                <Star key={i} size={16} fill="currentColor" />
+                            ))}
+                        </div>
+                        <span className="font-bold text-gray-900">Great quality!</span>
+                    </div>
+                    <p className="text-gray-600 text-sm">Fresh and delivered on time. Will order again.</p>
+                    <p className="text-xs text-gray-400 mt-2">Rahul S. • Verified Buyer</p>
+                </div>
+                <div>
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="flex text-yellow-400">
+                            {[...Array(4)].map((_, i) => (
+                                <Star key={i} size={16} fill="currentColor" />
+                            ))}
+                            <Star size={16} className="text-gray-300" />
+                        </div>
+                        <span className="font-bold text-gray-900">Good packaging</span>
+                    </div>
+                    <p className="text-gray-600 text-sm">Liked the eco-friendly packaging.</p>
+                    <p className="text-xs text-gray-400 mt-2">Priya M. • Verified Buyer</p>
+                </div>
+            </div>
+            <button className="mt-6 text-leaf-600 font-bold hover:underline">Write a Review</button>
+        </div>
+
         {/* Smart Recommendations */}
         {recommendations.length > 0 && (
           <div className="mb-12">
