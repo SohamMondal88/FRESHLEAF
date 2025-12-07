@@ -1,5 +1,5 @@
 
-import { Product, BlogPost, Testimonial, Order } from './types';
+import { Product, BlogPost, Testimonial, Order, DeliverySlot, Rider, Coupon } from './types';
 
 export const COMPANY_INFO = {
   name: "FreshLeaf",
@@ -10,10 +10,26 @@ export const COMPANY_INFO = {
   minOrderValue: 150
 };
 
-export const COUPONS = [
-  { code: 'FRESH50', type: 'flat', value: 50, minOrder: 300, description: 'Flat ₹50 off on orders above ₹300' },
-  { code: 'WELCOME10', type: 'percent', value: 10, minOrder: 0, description: '10% off for new users' },
-  { code: 'VEGGIE20', type: 'percent', value: 20, minOrder: 500, description: '20% off on orders above ₹500' },
+export const COUPONS: Coupon[] = [
+  { id: 'c1', code: 'FRESH50', type: 'flat', value: 50, minOrder: 300, description: 'Flat ₹50 off on orders above ₹300', isActive: true },
+  { id: 'c2', code: 'WELCOME10', type: 'percent', value: 10, minOrder: 0, description: '10% off for new users', isActive: true },
+  { id: 'c3', code: 'VEGGIE20', type: 'percent', value: 20, minOrder: 500, description: '20% off on orders above ₹500', isActive: true },
+  { id: 'c4', code: 'SUMMER30', type: 'flat', value: 30, minOrder: 200, description: 'Cool off with ₹30 discount', isActive: false },
+];
+
+export const RIDERS: Rider[] = [
+  { id: 'r1', name: 'Ramesh Kumar', phone: '9876543210', status: 'Available', rating: 4.8, vehicle: 'Honda Activa' },
+  { id: 'r2', name: 'Suresh Singh', phone: '9876543211', status: 'Busy', currentOrderId: 'FL-928374', rating: 4.5, vehicle: 'Bajaj Pulsar' },
+  { id: 'r3', name: 'Abdul Rahman', phone: '9876543212', status: 'Offline', rating: 4.9, vehicle: 'TVS Jupiter' },
+  { id: 'r4', name: 'Vikram Das', phone: '9876543213', status: 'Available', rating: 4.7, vehicle: 'Hero Splendor' },
+];
+
+export const DELIVERY_SLOTS: DeliverySlot[] = [
+  { id: 's1', label: 'Early Morning', time: '6:00 AM - 9:00 AM', price: 0, available: true },
+  { id: 's2', label: 'Mid Morning', time: '9:00 AM - 12:00 PM', price: 0, available: true },
+  { id: 's3', label: 'Afternoon', time: '12:00 PM - 3:00 PM', price: 0, available: true },
+  { id: 's4', label: 'Evening', time: '3:00 PM - 6:00 PM', price: 0, available: true },
+  { id: 's5', label: 'Instant Delivery', time: 'Within 45 mins', price: 49, available: true }, // Premium slot
 ];
 
 export const FAQS = [

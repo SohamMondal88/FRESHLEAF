@@ -43,6 +43,23 @@ export interface Testimonial {
   rating: number;
 }
 
+export interface SavedCard {
+  id: string;
+  last4: string;
+  brand: string; // Visa, MasterCard
+  expiry: string;
+  holderName: string;
+}
+
+export interface UserNotification {
+  id: string;
+  title: string;
+  message: string;
+  date: string;
+  read: boolean;
+  type: 'order' | 'promo' | 'system';
+}
+
 export interface User {
   id: string;
   name: string;
@@ -55,6 +72,16 @@ export interface User {
   isAdmin?: boolean; // Admin role
   avatar?: string;
   walletBalance?: number;
+  savedCards?: SavedCard[];
+  notifications?: UserNotification[];
+}
+
+export interface DeliverySlot {
+  id: string;
+  label: string; // "Morning 8am - 11am"
+  time: string;
+  price: number; // 0 for free, or extra for express
+  available: boolean;
 }
 
 export interface Order {
@@ -70,6 +97,28 @@ export interface Order {
   courier?: string; // e.g., 'Bombax'
   customerName?: string;
   customerPhone?: string;
+  deliverySlot?: string;
+  riderName?: string;
+}
+
+export interface Rider {
+  id: string;
+  name: string;
+  phone: string;
+  status: 'Available' | 'Busy' | 'Offline';
+  currentOrderId?: string;
+  rating: number;
+  vehicle: string;
+}
+
+export interface Coupon {
+  id: string;
+  code: string;
+  type: 'flat' | 'percent';
+  value: number;
+  minOrder: number;
+  description: string;
+  isActive: boolean;
 }
 
 export interface TrackingStep {

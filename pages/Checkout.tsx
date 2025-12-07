@@ -4,8 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { useCart } from '../services/CartContext';
 import { useAuth } from '../services/AuthContext';
 import { useOrder } from '../services/OrderContext';
-import { ShieldCheck, Banknote, Smartphone, Truck, MapPin, AlertTriangle, AlertOctagon, Loader2, CreditCard } from 'lucide-react';
-import { COMPANY_INFO } from '../constants';
+import { ShieldCheck, Banknote, Smartphone, Truck, MapPin, AlertTriangle, AlertOctagon, Loader2, CreditCard, Clock } from 'lucide-react';
+import { COMPANY_INFO, DELIVERY_SLOTS } from '../constants';
 import { RazorpayMock } from '../components/RazorpayMock';
 
 export const Checkout: React.FC = () => {
@@ -26,7 +26,8 @@ export const Checkout: React.FC = () => {
     address: user?.address || '',
     city: 'Kolkata', // Default
     zip: user?.pincode || '',
-    paymentMethod: 'cod'
+    paymentMethod: 'cod',
+    deliverySlot: DELIVERY_SLOTS[0].id
   });
 
   // BLOCK: Min Order Check
@@ -174,9 +175,10 @@ export const Checkout: React.FC = () => {
     const fullAddress = `${formData.address}, ${formData.city} - ${formData.zip}`;
     const paymentLabel = formData.paymentMethod === 'cod' ? 'Cash on Delivery' : 'Online Payment';
     const fullName = `${formData.firstName} ${formData.lastName}`;
+    const slot = DELIVERY_SLOTS.find(s => s.id === formData.deliverySlot);
     
     // Create order 
-    const orderId = await createOrder(cartItems, grandTotal, fullAddress, paymentLabel, formData.phone, fullName);
+    const orderId = await createOrder(cartItems, grandTotal + (slot?.price || 0), fullAddress, paymentLabel, formData.phone, fullName);
     
     clearCart();
     setLoading(false);
@@ -200,11 +202,13 @@ export const Checkout: React.FC = () => {
     }
   };
 
+  const selectedSlot = DELIVERY_SLOTS.find(s => s.id === formData.deliverySlot);
+
   return (
     <div className="py-12 bg-gray-50 min-h-screen">
       {showRazorpay && (
         <RazorpayMock 
-          amount={grandTotal}
+          amount={grandTotal + (selectedSlot?.price || 0)}
           onSuccess={() => { setShowRazorpay(false); finalizeOrder(); }}
           onFailure={() => alert("Payment Failed. Try again.")}
           onClose={() => setShowRazorpay(false)}
@@ -280,20 +284,51 @@ export const Checkout: React.FC = () => {
                   <p className="text-[10px] text-gray-400 mt-1">We operate only in Kolkata</p>
                 </div>
               </div>
-
-              <div className="mt-4 p-4 bg-blue-50 border border-blue-100 rounded-xl flex items-center gap-3">
-                 <Truck className="text-blue-600" size={24} />
-                 <div>
-                    <h4 className="font-bold text-gray-900 text-sm">Fulfilled by Bombax Logistics</h4>
-                    <p className="text-xs text-gray-500">Fast delivery partner for Kolkata & Metro regions.</p>
-                 </div>
-              </div>
             </div>
 
-            {/* Step 2: Payment */}
+            {/* Step 2: Delivery Slot */}
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
               <h2 className="text-xl font-bold mb-6 flex items-center gap-3 text-gray-900">
                 <span className="bg-leaf-600 text-white w-8 h-8 flex items-center justify-center rounded-full text-sm">2</span>
+                Delivery Slot
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {DELIVERY_SLOTS.map(slot => (
+                  <label 
+                    key={slot.id} 
+                    className={`border rounded-xl p-4 cursor-pointer transition-all ${formData.deliverySlot === slot.id ? 'border-leaf-600 bg-leaf-50 ring-1 ring-leaf-600' : 'border-gray-200 hover:border-leaf-300'} ${!slot.available ? 'opacity-50 cursor-not-allowed bg-gray-50' : ''}`}
+                  >
+                    <input 
+                      type="radio" 
+                      name="deliverySlot" 
+                      value={slot.id} 
+                      checked={formData.deliverySlot === slot.id} 
+                      onChange={handleInputChange} 
+                      disabled={!slot.available}
+                      className="hidden" 
+                    />
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <span className="font-bold text-gray-900 block">{slot.label}</span>
+                        <span className="text-xs text-gray-500 flex items-center gap-1"><Clock size={12}/> {slot.time}</span>
+                      </div>
+                      <div className="text-right">
+                        {slot.price > 0 ? (
+                          <span className="text-sm font-bold text-gray-900">+₹{slot.price}</span>
+                        ) : (
+                          <span className="text-xs font-bold text-green-600 bg-green-100 px-2 py-1 rounded">FREE</span>
+                        )}
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Step 3: Payment */}
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+              <h2 className="text-xl font-bold mb-6 flex items-center gap-3 text-gray-900">
+                <span className="bg-leaf-600 text-white w-8 h-8 flex items-center justify-center rounded-full text-sm">3</span>
                 Payment Method
               </h2>
               
@@ -354,13 +389,19 @@ export const Checkout: React.FC = () => {
                         <span className="font-bold">-{formatPrice(discount)}</span>
                     </div>
                   )}
+                  {selectedSlot?.price > 0 && (
+                    <div className="flex justify-between text-gray-600 text-sm">
+                        <span>Delivery Slot ({selectedSlot.label})</span>
+                        <span>{formatPrice(selectedSlot.price)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-gray-600 text-sm">
                     <span>Shipping (Bombax)</span>
                     <span className="text-green-600 font-bold">Free</span>
                   </div>
                   <div className="flex justify-between text-gray-900 font-bold text-xl pt-2 mt-2 border-t border-gray-100">
                     <span>Total</span>
-                    <span>{formatPrice(grandTotal)}</span>
+                    <span>{formatPrice(grandTotal + (selectedSlot?.price || 0))}</span>
                   </div>
                 </div>
 

@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User } from '../types';
+import { User, SavedCard, UserNotification } from '../types';
 
 interface AuthContextType {
   user: User | null;
@@ -14,6 +14,10 @@ interface AuthContextType {
   isAuthenticated: boolean;
   walletBalance: number;
   addToWallet: (amount: number) => void;
+  addSavedCard: (card: SavedCard) => void;
+  removeSavedCard: (id: string) => void;
+  notifications: UserNotification[];
+  markNotificationRead: (id: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,6 +29,7 @@ const DB_SESSION_KEY = 'freshleaf_session_user';
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [walletBalance, setWalletBalance] = useState(0);
+  const [notifications, setNotifications] = useState<UserNotification[]>([]);
 
   // Load user session on mount
   useEffect(() => {
@@ -32,8 +37,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (session) {
       const parsedUser = JSON.parse(session);
       setUser(parsedUser);
-      // Mock Wallet Load
       setWalletBalance(parsedUser.walletBalance || 0);
+      setNotifications(parsedUser.notifications || []);
     }
   }, []);
 
@@ -66,8 +71,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         let existingUser = users.find((u: User) => u.phone === phone);
         
         if (!existingUser) {
-             // Create a partial user for now or require full signup
-             // For demo flow, we'll create a new user
              existingUser = {
                 id: 'usr_' + Math.random().toString(36).substr(2, 9),
                 name: 'User',
@@ -75,7 +78,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 phone: phone,
                 isPro: false,
                 avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${phone}`,
-                walletBalance: 0
+                walletBalance: 0,
+                savedCards: [],
+                notifications: [
+                  { id: 'n1', title: 'Welcome!', message: 'Thanks for joining FreshLeaf.', date: new Date().toDateString(), read: false, type: 'system' }
+                ]
              };
         }
         
@@ -88,7 +95,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = async (email: string, password: string) => {
     await new Promise(resolve => setTimeout(resolve, 800));
     const users = JSON.parse(localStorage.getItem(DB_USERS_KEY) || '[]');
-    const existingUser = users.find((u: User) => u.email === email); // In real app, check password hash
+    const existingUser = users.find((u: User) => u.email === email); 
 
     if (existingUser) {
       saveUserSession(existingUser);
@@ -103,14 +110,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             isPro: true,
             isAdmin: true,
             avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin',
-            walletBalance: 99999
+            walletBalance: 99999,
+            notifications: []
          };
          saveUserSession(adminUser);
          return true;
       }
 
-      // For demo convenience, allow login if not found (auto-signup style)
-      // Let's create a mock user if not found for smoother demo experience
+      // Auto-create user for demo
        const mockUser: User = {
         id: 'usr_' + Math.random().toString(36).substr(2, 9),
         name: email.split('@')[0],
@@ -118,7 +125,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         phone: '+91 8513028892',
         isPro: false,
         avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
-        walletBalance: 500
+        walletBalance: 500,
+        savedCards: [],
+        notifications: [
+           { id: 'n1', title: 'Welcome!', message: 'Thanks for joining FreshLeaf.', date: new Date().toDateString(), read: false, type: 'system' }
+        ]
       };
       saveUserSession(mockUser);
       return true;
@@ -134,7 +145,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       phone,
       isPro: false,
       avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
-      walletBalance: 100 // Welcome bonus
+      walletBalance: 100, // Welcome bonus
+      savedCards: [],
+      notifications: [
+         { id: 'n1', title: 'Welcome!', message: 'Thanks for joining FreshLeaf.', date: new Date().toDateString(), read: false, type: 'system' }
+      ]
     };
     saveUserSession(newUser);
     return true;
@@ -161,12 +176,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const newBalance = (user.walletBalance || 0) + amount;
     setWalletBalance(newBalance);
     updateProfile({ walletBalance: newBalance });
-  }
+  };
+
+  const addSavedCard = (card: SavedCard) => {
+    if(!user) return;
+    const updatedCards = [...(user.savedCards || []), card];
+    updateProfile({ savedCards: updatedCards });
+  };
+
+  const removeSavedCard = (id: string) => {
+    if(!user) return;
+    const updatedCards = user.savedCards?.filter(c => c.id !== id) || [];
+    updateProfile({ savedCards: updatedCards });
+  };
+
+  const markNotificationRead = (id: string) => {
+    if(!user) return;
+    const updatedNotifications = user.notifications?.map(n => n.id === id ? { ...n, read: true } : n) || [];
+    setNotifications(updatedNotifications);
+    updateProfile({ notifications: updatedNotifications });
+  };
 
   return (
     <AuthContext.Provider value={{ 
         user, login, signup, logout, updateProfile, joinMembership, 
-        isAuthenticated: !!user, sendOTP, loginWithOTP, walletBalance, addToWallet 
+        isAuthenticated: !!user, sendOTP, loginWithOTP, walletBalance, addToWallet,
+        addSavedCard, removeSavedCard, notifications: user?.notifications || [], markNotificationRead
     }}>
       {children}
     </AuthContext.Provider>
