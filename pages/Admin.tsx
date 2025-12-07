@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { BarChart3, Users, ShoppingBag, DollarSign, Package, Bell, Edit, Trash2, RefreshCw, Plus, Tag, Bike, Truck, MessageCircle, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { BarChart3, Users, ShoppingBag, DollarSign, Package, Bell, Edit, Trash2, RefreshCw, Plus, Tag, Bike, Truck, MessageCircle, X, CreditCard, Save } from 'lucide-react';
 import { PRODUCTS, RIDERS, COUPONS } from '../constants';
 import { useOrder } from '../services/OrderContext';
 import { useAuth } from '../services/AuthContext';
@@ -11,11 +11,31 @@ export const Admin: React.FC = () => {
   const { user } = useAuth();
   const { orders, updateOrderStatus, assignRider } = useOrder();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'products' | 'users' | 'riders' | 'coupons'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'orders' | 'products' | 'users' | 'riders' | 'coupons' | 'settings'>('dashboard');
   
   // Modal State for assigning rider
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showRiderModal, setShowRiderModal] = useState(false);
+
+  // Payment Settings State
+  const [paymentConfig, setPaymentConfig] = useState({
+    razorpayKeyId: '',
+    razorpayKeySecret: '',
+    merchantName: 'FreshLeaf Organics',
+    bankAccount: ''
+  });
+
+  useEffect(() => {
+    // Load fake config from local storage
+    const stored = localStorage.getItem('freshleaf_payment_config');
+    if (stored) setPaymentConfig(JSON.parse(stored));
+  }, []);
+
+  const savePaymentConfig = (e: React.FormEvent) => {
+    e.preventDefault();
+    localStorage.setItem('freshleaf_payment_config', JSON.stringify(paymentConfig));
+    alert("Payment Gateway settings saved!");
+  };
 
   if (!user || !user.isAdmin) {
     return (
@@ -174,6 +194,83 @@ export const Admin: React.FC = () => {
     </div>
   );
 
+  const PaymentSettings = () => (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="p-6 border-b border-gray-100">
+        <h3 className="font-bold text-gray-900 text-lg flex items-center gap-2"><CreditCard className="text-leaf-600"/> Payment Gateway Configuration</h3>
+        <p className="text-sm text-gray-500 mt-1">Configure your Razorpay details here to receive payments directly to your bank account.</p>
+      </div>
+      
+      <div className="p-8">
+        <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl mb-8 flex gap-3">
+          <div className="bg-blue-100 p-2 rounded-lg h-fit text-blue-600"><MessageCircle size={20} /></div>
+          <div>
+            <h4 className="font-bold text-blue-800 text-sm">How to get these details?</h4>
+            <ol className="list-decimal list-inside text-sm text-blue-700 mt-1 space-y-1">
+              <li>Register as a Merchant on <a href="#" className="underline font-bold">Razorpay.com</a>.</li>
+              <li>Complete your KYC and link your Bank Account.</li>
+              <li>Go to Settings {'>'} API Keys to generate Key ID and Secret.</li>
+              <li>Paste them below.</li>
+            </ol>
+          </div>
+        </div>
+
+        <form onSubmit={savePaymentConfig} className="max-w-2xl space-y-6">
+           <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Merchant Name</label>
+                <input 
+                  type="text" 
+                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:border-leaf-500"
+                  placeholder="e.g. FreshLeaf Foods"
+                  value={paymentConfig.merchantName}
+                  onChange={e => setPaymentConfig({...paymentConfig, merchantName: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Linked Bank Account (Last 4)</label>
+                <input 
+                  type="text" 
+                  className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:border-leaf-500"
+                  placeholder="e.g. 4589"
+                  value={paymentConfig.bankAccount}
+                  onChange={e => setPaymentConfig({...paymentConfig, bankAccount: e.target.value})}
+                />
+              </div>
+           </div>
+
+           <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Razorpay Key ID</label>
+              <input 
+                type="text" 
+                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:border-leaf-500 font-mono text-sm"
+                placeholder="rzp_test_..."
+                value={paymentConfig.razorpayKeyId}
+                onChange={e => setPaymentConfig({...paymentConfig, razorpayKeyId: e.target.value})}
+              />
+           </div>
+
+           <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Razorpay Key Secret</label>
+              <input 
+                type="password" 
+                className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 focus:outline-none focus:border-leaf-500 font-mono text-sm"
+                placeholder="••••••••••••••••"
+                value={paymentConfig.razorpayKeySecret}
+                onChange={e => setPaymentConfig({...paymentConfig, razorpayKeySecret: e.target.value})}
+              />
+           </div>
+
+           <div className="pt-4 border-t border-gray-100 flex justify-end">
+              <button type="submit" className="bg-leaf-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-leaf-700 shadow-lg shadow-leaf-200 flex items-center gap-2">
+                <Save size={18} /> Save Settings
+              </button>
+           </div>
+        </form>
+      </div>
+    </div>
+  );
+
   const RidersTable = () => (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="p-6 border-b border-gray-100 flex justify-between items-center">
@@ -248,6 +345,7 @@ export const Admin: React.FC = () => {
            <TabButton id="users" label="Users" icon={Users} />
            <TabButton id="riders" label="Delivery Fleet" icon={Bike} />
            <TabButton id="coupons" label="Coupons" icon={Tag} />
+           <TabButton id="settings" label="Settings" icon={CreditCard} />
         </nav>
         <div className="mt-auto pt-6 border-t border-leaf-700">
           <div className="flex items-center gap-3">
@@ -296,6 +394,7 @@ export const Admin: React.FC = () => {
         {activeTab === 'orders' && <div className="animate-in fade-in"><OrdersTable /></div>}
         {activeTab === 'riders' && <div className="animate-in fade-in"><RidersTable /></div>}
         {activeTab === 'coupons' && <div className="animate-in fade-in"><CouponsTable /></div>}
+        {activeTab === 'settings' && <div className="animate-in fade-in"><PaymentSettings /></div>}
         {activeTab === 'users' && <div className="animate-in fade-in bg-white p-10 rounded-xl shadow-sm text-center text-gray-500">User Management Module Placeholder</div>}
 
       </div>
