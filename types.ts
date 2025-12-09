@@ -80,6 +80,9 @@ export interface User {
   isAdmin?: boolean; // Admin role
   avatar?: string;
   walletBalance?: number;
+  creditPoints?: number; // Loyalty Points
+  referralCode?: string; // Unique code for the user
+  referredBy?: string; // Code of the person who referred them
   savedCards?: SavedCard[];
   notifications?: UserNotification[];
   tickets?: SupportTicket[];
@@ -110,6 +113,8 @@ export interface Order {
   deliverySlot?: string;
   riderId?: string; // ID of the assigned rider
   riderName?: string;
+  pointsRedeemed?: number; // Points used in this order
+  pointsEarned?: number; // Points earned from this order
 }
 
 export interface Rider {

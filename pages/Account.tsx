@@ -4,11 +4,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { 
   Package, Settings, MapPin, CreditCard, Bell, Heart, LogOut, 
   Crown, ChevronRight, User, Camera, Plus, Trash2, Home, 
-  TrendingUp, DollarSign, Calendar, FileText, Edit2, X, Check, HelpCircle, MessageSquare
+  TrendingUp, DollarSign, Calendar, FileText, Edit2, X, Check, HelpCircle, MessageSquare, Coins, Wallet, Share2, Copy
 } from 'lucide-react';
 import { useAuth } from '../services/AuthContext';
 import { useOrder } from '../services/OrderContext';
 import { useCart } from '../services/CartContext';
+import { useToast } from '../services/ToastContext';
 
 // --- MOCK DATA FOR CHARTS & TRANSACTIONS ---
 const TRANSACTIONS = [
@@ -19,9 +20,10 @@ const TRANSACTIONS = [
 ];
 
 export const Account: React.FC = () => {
-  const { user, logout, updateProfile, addSavedCard, removeSavedCard, notifications, markNotificationRead } = useAuth();
+  const { user, logout, updateProfile, addSavedCard, removeSavedCard, notifications, markNotificationRead, creditPoints, walletBalance } = useAuth();
   const { orders } = useOrder();
   const { wishlist } = useCart();
+  const { addToast } = useToast();
   const navigate = useNavigate();
   
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -96,6 +98,13 @@ export const Account: React.FC = () => {
     setNewCard({ number: '', name: '', expiry: '' });
   };
 
+  const copyReferralCode = () => {
+    if (user.referralCode) {
+        navigator.clipboard.writeText(user.referralCode);
+        addToast('Referral code copied!', 'success');
+    }
+  };
+
   // --- SUB-COMPONENTS ---
   
   const DashboardView = () => (
@@ -112,9 +121,9 @@ export const Account: React.FC = () => {
           <div className="text-xs text-gray-400 font-bold mt-2">Lifetime</div>
         </div>
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-          <div className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Wishlist</div>
-          <div className="text-2xl font-extrabold text-gray-900">{wishlist.length}</div>
-          <div className="text-xs text-leaf-600 font-bold mt-2">Items saved</div>
+          <div className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Credit Points</div>
+          <div className="text-2xl font-extrabold text-amber-500">{creditPoints}</div>
+          <div className="text-xs text-leaf-600 font-bold mt-2">Use at checkout</div>
         </div>
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
           <div className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Active</div>
@@ -165,6 +174,24 @@ export const Account: React.FC = () => {
             {notifications.length === 0 && <p className="text-xs text-gray-400">No new notifications</p>}
           </div>
         </div>
+      </div>
+      
+      {/* Referral Section */}
+      <div className="bg-gradient-to-r from-purple-500 to-purple-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+         <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div>
+               <h3 className="text-xl font-bold mb-2">Refer & Earn ₹100 Credits</h3>
+               <p className="text-purple-100 text-sm max-w-md">Share your unique code with friends. They get 50 bonus points, and you get 100 points when they order!</p>
+            </div>
+            <div className="bg-white/20 backdrop-blur-md p-4 rounded-xl border border-white/20 flex flex-col items-center">
+               <p className="text-xs font-bold uppercase tracking-widest text-purple-200 mb-1">Your Code</p>
+               <div className="flex items-center gap-3">
+                  <span className="text-2xl font-mono font-bold">{user.referralCode || 'GENERATE'}</span>
+                  <button onClick={copyReferralCode} className="p-2 hover:bg-white/20 rounded-lg transition"><Copy size={18}/></button>
+               </div>
+            </div>
+         </div>
       </div>
     </div>
   );
@@ -229,14 +256,26 @@ export const Account: React.FC = () => {
 
   const WalletView = () => (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-2xl p-8 text-white flex flex-col md:flex-row justify-between items-center shadow-xl">
-        <div>
-          <p className="text-gray-400 text-sm font-medium mb-1">FreshLeaf Wallet Balance</p>
-          <h2 className="text-4xl font-extrabold">₹1,250.00</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-8 text-white flex flex-col justify-between shadow-xl min-h-[180px]">
+            <div>
+            <p className="text-gray-400 text-sm font-medium mb-1 flex items-center gap-2"><Wallet size={16}/> Wallet Balance</p>
+            <h2 className="text-4xl font-extrabold">₹{walletBalance.toLocaleString('en-IN')}</h2>
+            </div>
+            <div className="mt-4">
+            <button className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-6 py-2 rounded-xl font-bold transition text-sm">Add Money</button>
+            </div>
         </div>
-        <div className="mt-6 md:mt-0 flex gap-3">
-          <button className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-6 py-3 rounded-xl font-bold transition">Add Money</button>
-          <button className="bg-leaf-500 hover:bg-leaf-600 text-white px-6 py-3 rounded-xl font-bold transition shadow-lg shadow-leaf-900/50">Redeem Points</button>
+
+        <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-8 text-white flex flex-col justify-between shadow-xl min-h-[180px]">
+            <div>
+            <p className="text-amber-100 text-sm font-medium mb-1 flex items-center gap-2"><Coins size={16}/> Credit Points</p>
+            <h2 className="text-4xl font-extrabold">{creditPoints} Pts</h2>
+            <p className="text-xs text-amber-100 mt-1">1 Point = ₹1. Earn 5% on every order.</p>
+            </div>
+            <div className="mt-4">
+            <button onClick={() => navigate('/shop')} className="bg-white text-orange-600 hover:bg-orange-50 px-6 py-2 rounded-xl font-bold transition text-sm shadow-sm">Redeem Now</button>
+            </div>
         </div>
       </div>
 
@@ -371,7 +410,7 @@ export const Account: React.FC = () => {
                 { id: 'dashboard', label: 'Dashboard', icon: Home },
                 { id: 'orders', label: 'My Orders', icon: Package },
                 { id: 'addresses', label: 'Addresses', icon: MapPin },
-                { id: 'wallet', label: 'Wallet & Payments', icon: CreditCard },
+                { id: 'wallet', label: 'Wallet & Points', icon: CreditCard },
                 { id: 'support', label: 'Support Tickets', icon: HelpCircle },
                 { id: 'settings', label: 'Account Settings', icon: Settings },
               ].map(item => (

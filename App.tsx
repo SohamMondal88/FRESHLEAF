@@ -26,8 +26,8 @@ import { Subscription } from './pages/Subscription';
 
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <ToastProvider>
+    <ToastProvider>
+      <AuthProvider>
         <OrderProvider>
           <CartProvider>
             <HashRouter>
@@ -78,8 +78,8 @@ const App: React.FC = () => {
             </HashRouter>
           </CartProvider>
         </OrderProvider>
-      </ToastProvider>
-    </AuthProvider>
+      </AuthProvider>
+    </ToastProvider>
   );
 };
 

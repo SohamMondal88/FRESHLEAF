@@ -1,11 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Package, ChevronRight, Clock, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { useOrder } from '../services/OrderContext';
 import { useAuth } from '../services/AuthContext';
+import { Order } from '../types';
 
-const OrderItem = ({ order, cancelOrder }: { order: any, cancelOrder: any }) => {
+const OrderItem: React.FC<{ order: Order, cancelOrder: (id: string) => Promise<boolean> }> = ({ order, cancelOrder }) => {
   const [timeLeft, setTimeLeft] = useState(0);
 
   const formatPrice = (price: number) =>

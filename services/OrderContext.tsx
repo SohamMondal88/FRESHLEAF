@@ -14,7 +14,7 @@ declare global {
 
 interface OrderContextType {
   orders: Order[];
-  createOrder: (items: CartItem[], total: number, address: string, paymentMethod: string, phone: string, name: string) => Promise<string>;
+  createOrder: (items: CartItem[], total: number, address: string, paymentMethod: string, phone: string, name: string, pointsRedeemed?: number) => Promise<string>;
   getOrderById: (id: string) => Order | undefined;
   generateInvoice: (order: Order) => void;
   updateOrderStatus: (orderId: string, status: Order['status']) => void;
@@ -27,7 +27,7 @@ const OrderContext = createContext<OrderContextType | undefined>(undefined);
 const DB_ORDERS_KEY = 'freshleaf_orders_db';
 
 export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const { user, updateProfile, creditPoints } = useAuth();
   const { addToast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
 
@@ -134,18 +134,20 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const finalY = doc.lastAutoTable.finalY + 10;
     
     doc.setFontSize(10);
-    doc.text("Subtotal:", 140, finalY);
+    doc.text("Total:", 140, finalY);
     doc.text(`Rs. ${order.total}`, 195, finalY, { align: 'right' });
     
-    doc.text("Shipping:", 140, finalY + 5);
-    doc.text("Rs. 0", 195, finalY + 5, { align: 'right' });
+    if (order.pointsRedeemed && order.pointsRedeemed > 0) {
+        doc.text("Points Redeemed:", 140, finalY + 5);
+        doc.text(`- Rs. ${order.pointsRedeemed}`, 195, finalY + 5, { align: 'right' });
+    }
     
     doc.setFillColor(240, 240, 240);
     doc.rect(135, finalY + 10, 65, 12, 'F');
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0, 0, 0);
-    doc.text("Grand Total:", 140, finalY + 18);
+    doc.text("Paid Amount:", 140, finalY + 18);
     doc.text(`Rs. ${order.total}`, 195, finalY + 18, { align: 'right' });
 
     // Footer
@@ -159,12 +161,21 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     doc.save(`FreshLeaf_Invoice_${order.id}.pdf`);
   };
 
-  const createOrder = async (items: CartItem[], total: number, address: string, paymentMethod: string, phone: string, name: string) => {
+  const createOrder = async (items: CartItem[], total: number, address: string, paymentMethod: string, phone: string, name: string, pointsRedeemed: number = 0) => {
     await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate processing delay
     
     const orderId = 'FL-' + Math.floor(100000 + Math.random() * 900000);
     const trackingId = 'BMX-' + Math.random().toString(36).substr(2, 9).toUpperCase(); // BMX prefix for Bombax
     
+    // Points Logic: Award 5% of final paid value
+    const pointsEarned = Math.floor(total * 0.05);
+    
+    // Update User Points
+    if (user) {
+        const newPointBalance = (creditPoints || 0) - pointsRedeemed + pointsEarned;
+        updateProfile({ creditPoints: newPointBalance });
+    }
+
     const newOrder: Order = {
       id: orderId,
       userId: user?.id || 'guest',
@@ -178,14 +189,16 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       trackingId,
       courier: 'Bombax',
       customerName: name,
-      customerPhone: phone
+      customerPhone: phone,
+      pointsRedeemed,
+      pointsEarned
     };
 
     const updatedOrders = [newOrder, ...orders];
     saveOrders(updatedOrders);
     
     // Simulate WhatsApp Notification logic
-    const waMessage = `*New Order Placed!* %0A%0AOrder ID: ${newOrder.id}%0ACustomer: ${name}%0APhone: ${phone}%0AEmail: ${user?.email || 'Guest'}%0AAddress: ${address}%0AItems: ${items.map(i => `${i.quantity}x ${i.name.en}`).join(', ')}%0ATotal: ₹${total}%0A%0AInvoice PDF has been generated and sent.`;
+    const waMessage = `*New Order Placed!* %0A%0AOrder ID: ${newOrder.id}%0ACustomer: ${name}%0APhone: ${phone}%0AEmail: ${user?.email || 'Guest'}%0AAddress: ${address}%0AItems: ${items.map(i => `${i.quantity}x ${i.name.en}`).join(', ')}%0ATotal Paid: ₹${total}%0A(Points Used: ${pointsRedeemed})%0A%0AInvoice PDF has been generated and sent.`;
     
     // Simulate sending to Company
     console.log(`[WhatsApp Bot] Sending to Company (${COMPANY_INFO.whatsapp}):`, waMessage);
@@ -194,7 +207,7 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     console.log(`[WhatsApp Bot] Sending to User (${phone}):`, waMessage);
     
     addToast('Order details sent to your WhatsApp successfully!', 'success');
-    addToast('Invoice PDF sent to your WhatsApp.', 'success');
+    if (pointsEarned > 0) addToast(`You earned ${pointsEarned} Credit Points!`, 'success');
     
     return newOrder.id;
   };
@@ -220,6 +233,18 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     );
     saveOrders(updatedOrders);
     
+    // Refund Points logic if needed
+    if (order.pointsRedeemed && order.pointsRedeemed > 0 && user) {
+        const refundedPoints = (creditPoints || 0) + order.pointsRedeemed;
+        // We might also want to remove pointsEarned, but let's keep it simple for now or assume points earned are pending until delivery.
+        // For this demo, let's reverse both.
+        const reversedEarned = order.pointsEarned || 0;
+        const finalBalance = refundedPoints - reversedEarned;
+        
+        updateProfile({ creditPoints: finalBalance });
+        addToast(`Points refunded: ${order.pointsRedeemed}`, 'info');
+    }
+
     // Simulate WhatsApp Cancellation update
     const message = `Order ${orderId} has been CANCELLED by the user.`;
     console.log(`[WhatsApp Bot] Sending Cancellation to Company & User: ${message}`);

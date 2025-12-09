@@ -128,7 +128,7 @@ export const PRODUCTS: Product[] = [
   createProduct('v-5', 'Beetroot', 'चुकंदर', 'বিট', 'Root Veg', 35, 'https://images.unsplash.com/photo-1596489853965-7467ba605663?auto=format&fit=crop&w=800&q=80', 'Fresh beetroot.', 'kg'),
   createProduct('v-6', 'Potato', 'आलू', 'আলু', 'Root Veg', 41, 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&w=800&q=80', 'Standard potatoes.', 'kg'),
   createProduct('v-7', 'Raw Banana (Plantain)', 'कच्चा केला', 'কাঁচ কলা', 'Other Veg', 17, 'https://images.unsplash.com/photo-1588613309228-3e4b3017a782?auto=format&fit=crop&w=800&q=80', 'Green plantains for cooking.', 'pc'),
-  createProduct('v-8', 'Amaranth Leaves', 'चौलाई', 'নটে শাক', 'Leafy', 21, 'https://images.unsplash.com/photo-1550411294-b3b1bd5fce1b?auto=format&fit=crop&w=800&q=80', 'Fresh red/green amaranth.', 'bunch'),
+  createProduct('v-8', 'Amaranth Leaves', 'चौलाई', 'नটে শাক', 'Leafy', 21, 'https://images.unsplash.com/photo-1550411294-b3b1bd5fce1b?auto=format&fit=crop&w=800&q=80', 'Fresh red/green amaranth.', 'bunch'),
   createProduct('v-9', 'Amla', 'आंवला', 'আমলকী', 'Other Veg', 90, 'https://images.unsplash.com/photo-1603208761073-2b2207908d07?auto=format&fit=crop&w=800&q=80', 'Indian gooseberry.', 'kg'),
   createProduct('v-10', 'Ash Gourd', 'पेठा', 'চাল কুমড়া', 'Other Veg', 22, 'https://images.unsplash.com/photo-1469324707621-3e0e7195d45d?auto=format&fit=crop&w=800&q=80', 'Winter melon.', 'kg'),
   createProduct('v-11', 'Baby Corn', 'बेबी कॉर्न', 'बेबि कॉर्न', 'Other Veg', 57, 'https://images.unsplash.com/photo-1551754655-cd27e38d2076?auto=format&fit=crop&w=800&q=80', 'Tender corn cobs.', 'kg'),

@@ -1,16 +1,16 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../services/CartContext';
 import { useAuth } from '../services/AuthContext';
 import { useOrder } from '../services/OrderContext';
-import { ShieldCheck, Banknote, Smartphone, Truck, MapPin, AlertTriangle, AlertOctagon, Loader2, CreditCard, Clock } from 'lucide-react';
+import { ShieldCheck, Banknote, Smartphone, Truck, MapPin, AlertTriangle, AlertOctagon, Loader2, CreditCard, Clock, Coins, Star } from 'lucide-react';
 import { COMPANY_INFO, DELIVERY_SLOTS } from '../constants';
 import { RazorpayMock } from '../components/RazorpayMock';
 
 export const Checkout: React.FC = () => {
   const { cartItems, cartTotal, discount, grandTotal, clearCart } = useCart();
-  const { user } = useAuth();
+  const { user, creditPoints } = useAuth();
   const { createOrder } = useOrder();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -18,6 +18,10 @@ export const Checkout: React.FC = () => {
   const [locationError, setLocationError] = useState('');
   const [showRazorpay, setShowRazorpay] = useState(false);
   
+  // Point Redemption State
+  const [redeemPoints, setRedeemPoints] = useState(0);
+  const [usePoints, setUsePoints] = useState(false);
+
   // Form State
   const [formData, setFormData] = useState({
     firstName: user?.name.split(' ')[0] || '',
@@ -29,6 +33,22 @@ export const Checkout: React.FC = () => {
     paymentMethod: 'cod',
     deliverySlot: DELIVERY_SLOTS[0].id
   });
+
+  // Calculate Payable Amount
+  const selectedSlot = DELIVERY_SLOTS.find(s => s.id === formData.deliverySlot);
+  const shippingCost = selectedSlot?.price || 0;
+  const initialPayable = grandTotal + shippingCost;
+  
+  // Logic: 1 Point = 1 Rupee (for simplicity, or change logic here)
+  const maxRedeemable = Math.min(creditPoints, initialPayable); 
+  const finalPayable = Math.max(0, initialPayable - (usePoints ? redeemPoints : 0));
+
+  // Reset redemption if cart changes significantly or logic requires
+  useEffect(() => {
+    if (usePoints && redeemPoints > maxRedeemable) {
+        setRedeemPoints(maxRedeemable);
+    }
+  }, [maxRedeemable, usePoints]);
 
   // BLOCK: Min Order Check
   if (cartTotal < COMPANY_INFO.minOrderValue) {
@@ -61,11 +81,9 @@ export const Checkout: React.FC = () => {
   // Validate Pincode API
   const checkPincode = async (pincode: string) => {
     if (pincode.length !== 6) return;
-    
     try {
       const response = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
       const data = await response.json();
-      
       if (data && data[0].Status === "Success") {
         const postOffice = data[0].PostOffice[0];
         const district = postOffice.District;
@@ -77,7 +95,7 @@ export const Checkout: React.FC = () => {
             (district.includes("Kolkata") || state === "West Bengal" || district.includes("24 Parganas"));
 
         if (isKolkataRegion) {
-           setFormData(prev => ({ ...prev, city: "Kolkata" })); // Normalize city to Kolkata
+           setFormData(prev => ({ ...prev, city: "Kolkata" })); 
            setLocationError("");
         } else {
            setLocationError("We currently only deliver to Kolkata (Pincodes starting with 700).");
@@ -93,7 +111,6 @@ export const Checkout: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
-    
     if (name === 'zip') {
         if (value.length === 6) {
             checkPincode(value);
@@ -110,23 +127,16 @@ export const Checkout: React.FC = () => {
       alert("Geolocation is not supported by your browser");
       return;
     }
-
     setIsLocating(true);
     setLocationError("");
-
     navigator.geolocation.getCurrentPosition(async (position) => {
       const { latitude, longitude } = position.coords;
-      
       try {
-        // Reverse Geocoding via OpenStreetMap (Free)
         const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
         const data = await response.json();
-        
         if (data && data.address) {
             const addr = data.address;
-            const detectedPincode = addr.postcode?.replace(/\s/g, '') || ""; // Remove spaces from postcode
-            
-            // Smart Address Construction
+            const detectedPincode = addr.postcode?.replace(/\s/g, '') || ""; 
             const streetParts = [
                 addr.road, 
                 addr.house_number ? `House No. ${addr.house_number}` : '',
@@ -134,17 +144,13 @@ export const Checkout: React.FC = () => {
                 addr.neighbourhood, 
                 addr.residential
             ].filter(Boolean);
-            
             const formattedAddr = streetParts.join(", ");
-
             setFormData(prev => ({
                 ...prev,
                 address: formattedAddr || prev.address,
-                city: "Kolkata", // Normalize for our service area check
+                city: "Kolkata", 
                 zip: detectedPincode
             }));
-
-            // Validate Service Area
             if (detectedPincode.startsWith("700")) {
                 setLocationError("");
             } else {
@@ -162,11 +168,7 @@ export const Checkout: React.FC = () => {
     }, (error) => {
         console.error("Geolocation error:", error);
         setIsLocating(false);
-        let msg = "Unable to retrieve location.";
-        if (error.code === 1) msg = "Location permission denied.";
-        else if (error.code === 2) msg = "Location unavailable.";
-        else if (error.code === 3) msg = "Location request timed out.";
-        setLocationError(msg);
+        setLocationError("Unable to retrieve location.");
     }, { enableHighAccuracy: true, timeout: 10000 });
   };
 
@@ -175,10 +177,10 @@ export const Checkout: React.FC = () => {
     const fullAddress = `${formData.address}, ${formData.city} - ${formData.zip}`;
     const paymentLabel = formData.paymentMethod === 'cod' ? 'Cash on Delivery' : 'Online Payment';
     const fullName = `${formData.firstName} ${formData.lastName}`;
-    const slot = DELIVERY_SLOTS.find(s => s.id === formData.deliverySlot);
+    const pointsUsed = usePoints ? redeemPoints : 0;
     
     // Create order 
-    const orderId = await createOrder(cartItems, grandTotal + (slot?.price || 0), fullAddress, paymentLabel, formData.phone, fullName);
+    const orderId = await createOrder(cartItems, finalPayable, fullAddress, paymentLabel, formData.phone, fullName, pointsUsed);
     
     clearCart();
     setLoading(false);
@@ -187,28 +189,23 @@ export const Checkout: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Strict Kolkata Validation
     if (!formData.zip.startsWith('700') || !!locationError) {
         setLocationError("Sorry, we strictly deliver only in Kolkata (Pincodes starting with 700).");
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
     }
-
-    if (formData.paymentMethod === 'online') {
+    if (formData.paymentMethod === 'online' && finalPayable > 0) {
       setShowRazorpay(true);
     } else {
       finalizeOrder();
     }
   };
 
-  const selectedSlot = DELIVERY_SLOTS.find(s => s.id === formData.deliverySlot);
-
   return (
     <div className="py-12 bg-gray-50 min-h-screen">
       {showRazorpay && (
         <RazorpayMock 
-          amount={grandTotal + (selectedSlot?.price || 0)}
+          amount={finalPayable}
           onSuccess={() => { setShowRazorpay(false); finalizeOrder(); }}
           onFailure={() => alert("Payment Failed. Try again.")}
           onClose={() => setShowRazorpay(false)}
@@ -333,6 +330,45 @@ export const Checkout: React.FC = () => {
               </h2>
               
               <div className="space-y-4">
+                {/* Credit Points Redemption UI */}
+                {creditPoints > 0 && (
+                  <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-5 mb-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2 text-amber-800 font-bold">
+                            <Coins size={20} className="text-amber-600" />
+                            Use Credit Points (Balance: {creditPoints})
+                        </div>
+                        <input 
+                            type="checkbox" 
+                            checked={usePoints}
+                            onChange={(e) => {
+                                setUsePoints(e.target.checked);
+                                if(e.target.checked) setRedeemPoints(Math.min(creditPoints, initialPayable));
+                                else setRedeemPoints(0);
+                            }}
+                            className="w-5 h-5 text-amber-600 rounded focus:ring-amber-500 cursor-pointer"
+                        />
+                    </div>
+                    {usePoints && (
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-sm font-medium text-gray-600">
+                                <span>Redeem: {redeemPoints} Pts</span>
+                                <span>Save: ₹{redeemPoints}</span>
+                            </div>
+                            <input 
+                                type="range" 
+                                min="0" 
+                                max={maxRedeemable} 
+                                value={redeemPoints}
+                                onChange={(e) => setRedeemPoints(Number(e.target.value))}
+                                className="w-full h-2 bg-amber-200 rounded-lg appearance-none cursor-pointer accent-amber-600"
+                            />
+                            <p className="text-xs text-amber-700">1 Point = ₹1. Slide to adjust redemption.</p>
+                        </div>
+                    )}
+                  </div>
+                )}
+
                 <label className={`flex items-center p-5 border rounded-xl cursor-pointer transition-all ${formData.paymentMethod === 'cod' ? 'border-leaf-500 bg-leaf-50 ring-1 ring-leaf-500' : 'border-gray-200 hover:border-leaf-300'}`}>
                   <input type="radio" name="paymentMethod" value="cod" checked={formData.paymentMethod === 'cod'} onChange={handleInputChange} className="h-5 w-5 text-leaf-600 accent-leaf-600" />
                   <div className="ml-4 flex items-center gap-4 flex-grow">
@@ -344,16 +380,18 @@ export const Checkout: React.FC = () => {
                   </div>
                 </label>
 
-                <label className={`flex items-center p-5 border rounded-xl cursor-pointer transition-all ${formData.paymentMethod === 'online' ? 'border-leaf-500 bg-leaf-50 ring-1 ring-leaf-500' : 'border-gray-200 hover:border-leaf-300'}`}>
-                  <input type="radio" name="paymentMethod" value="online" checked={formData.paymentMethod === 'online'} onChange={handleInputChange} className="h-5 w-5 text-leaf-600 accent-leaf-600" />
-                  <div className="ml-4 flex items-center gap-4 flex-grow">
-                    <div className="p-2 bg-white rounded-lg border border-gray-100"><CreditCard className="text-blue-600" size={24} /></div>
-                    <div>
-                      <span className="block font-bold text-gray-900">Pay Online (Razorpay)</span>
-                      <span className="block text-sm text-gray-500">UPI, Cards, Wallet, Netbanking</span>
+                {finalPayable > 0 && (
+                    <label className={`flex items-center p-5 border rounded-xl cursor-pointer transition-all ${formData.paymentMethod === 'online' ? 'border-leaf-500 bg-leaf-50 ring-1 ring-leaf-500' : 'border-gray-200 hover:border-leaf-300'}`}>
+                    <input type="radio" name="paymentMethod" value="online" checked={formData.paymentMethod === 'online'} onChange={handleInputChange} className="h-5 w-5 text-leaf-600 accent-leaf-600" />
+                    <div className="ml-4 flex items-center gap-4 flex-grow">
+                        <div className="p-2 bg-white rounded-lg border border-gray-100"><CreditCard className="text-blue-600" size={24} /></div>
+                        <div>
+                        <span className="block font-bold text-gray-900">Pay Online (Razorpay)</span>
+                        <span className="block text-sm text-gray-500">UPI, Cards, Wallet, Netbanking</span>
+                        </div>
                     </div>
-                  </div>
-                </label>
+                    </label>
+                )}
               </div>
             </div>
           </div>
@@ -385,23 +423,30 @@ export const Checkout: React.FC = () => {
                   </div>
                   {discount > 0 && (
                     <div className="flex justify-between text-green-600 text-sm">
-                        <span>Discount</span>
+                        <span>Coupon Discount</span>
                         <span className="font-bold">-{formatPrice(discount)}</span>
                     </div>
                   )}
                   {selectedSlot?.price > 0 && (
                     <div className="flex justify-between text-gray-600 text-sm">
-                        <span>Delivery Slot ({selectedSlot.label})</span>
+                        <span>Delivery ({selectedSlot.label})</span>
                         <span>{formatPrice(selectedSlot.price)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-gray-600 text-sm">
-                    <span>Shipping (Bombax)</span>
-                    <span className="text-green-600 font-bold">Free</span>
-                  </div>
+                  {usePoints && redeemPoints > 0 && (
+                    <div className="flex justify-between text-amber-600 text-sm font-bold">
+                        <span>Points Redeemed</span>
+                        <span>-{formatPrice(redeemPoints)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-gray-900 font-bold text-xl pt-2 mt-2 border-t border-gray-100">
-                    <span>Total</span>
-                    <span>{formatPrice(grandTotal + (selectedSlot?.price || 0))}</span>
+                    <span>Payable Amount</span>
+                    <span>{formatPrice(finalPayable)}</span>
+                  </div>
+                  
+                  {/* Points Earning Info */}
+                  <div className="bg-blue-50 text-blue-700 text-xs p-2 rounded-lg text-center font-bold flex items-center justify-center gap-1">
+                     <Star size={12} fill="currentColor"/> You will earn {Math.floor(finalPayable * 0.05)} Points on this order!
                   </div>
                 </div>
 
