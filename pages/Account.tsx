@@ -4,23 +4,16 @@ import { Link, useNavigate } from 'react-router-dom';
 import { 
   Package, Settings, MapPin, CreditCard, Bell, Heart, LogOut, 
   Crown, ChevronRight, User, Camera, Plus, Trash2, Home, 
-  TrendingUp, DollarSign, Calendar, FileText, Edit2, X, Check, HelpCircle, MessageSquare, Coins, Wallet, Share2, Copy
+  TrendingUp, DollarSign, Calendar, FileText, Edit2, X, Check, HelpCircle, MessageSquare, Coins, Wallet, Share2, Copy, Send
 } from 'lucide-react';
 import { useAuth } from '../services/AuthContext';
 import { useOrder } from '../services/OrderContext';
 import { useCart } from '../services/CartContext';
 import { useToast } from '../services/ToastContext';
-
-// --- MOCK DATA FOR CHARTS & TRANSACTIONS ---
-const TRANSACTIONS = [
-  { id: 'TXN-8821', date: 'Oct 24, 2023', type: 'Debit', description: 'Order #ORD-8821', amount: -1250, status: 'Completed' },
-  { id: 'TXN-8820', date: 'Oct 20, 2023', type: 'Credit', description: 'Refund for #ORD-8819', amount: +350, status: 'Completed' },
-  { id: 'TXN-8815', date: 'Oct 15, 2023', type: 'Debit', description: 'Order #ORD-8815', amount: -850, status: 'Completed' },
-  { id: 'TXN-8801', date: 'Oct 01, 2023', type: 'Credit', description: 'Wallet Top-up', amount: +2000, status: 'Completed' },
-];
+import { COMPANY_INFO } from '../constants';
 
 export const Account: React.FC = () => {
-  const { user, logout, updateProfile, addSavedCard, removeSavedCard, notifications, markNotificationRead, creditPoints, walletBalance } = useAuth();
+  const { user, logout, updateProfile, addSavedCard, removeSavedCard, notifications, markNotificationRead, creditPoints, walletBalance, createSupportTicket } = useAuth();
   const { orders } = useOrder();
   const { wishlist } = useCart();
   const { addToast } = useToast();
@@ -29,12 +22,17 @@ export const Account: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isEditingAddress, setIsEditingAddress] = useState(false);
   const [isAddingCard, setIsAddingCard] = useState(false);
+  const [isCreatingTicket, setIsCreatingTicket] = useState(false);
+  
+  // Ticket Form State
+  const [ticketSubject, setTicketSubject] = useState('');
+  const [ticketMessage, setTicketMessage] = useState('');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Address State
   const [addresses, setAddresses] = useState([
     { id: 1, type: 'Home', text: user?.address || '123 Green Market, Sector 4, New Delhi', isDefault: true },
-    { id: 2, type: 'Work', text: 'Business Hub, Floor 4, Cyber City, Gurgaon', isDefault: false }
   ]);
   const [newAddress, setNewAddress] = useState({ type: 'Home', text: '' });
   
@@ -47,18 +45,19 @@ export const Account: React.FC = () => {
   }
 
   // --- ANALYTICS CALCULATIONS ---
-  const totalSpent = orders.reduce((acc, order) => acc + order.total, 0);
-  const activeOrders = orders.filter(o => o.status !== 'Delivered' && o.status !== 'Cancelled').length;
+  const myOrders = orders.filter(o => o.userId === user.id);
+  const totalSpent = myOrders.reduce((acc, order) => acc + order.total, 0);
+  const activeOrders = myOrders.filter(o => o.status !== 'Delivered' && o.status !== 'Cancelled').length;
 
-  const monthlyData = [
-    { month: 'Jun', amount: 0 },
-    { month: 'Jul', amount: 1500 },
-    { month: 'Aug', amount: 3200 },
-    { month: 'Sep', amount: 2100 },
-    { month: 'Oct', amount: totalSpent > 0 ? totalSpent : 4500 },
-    { month: 'Nov', amount: 1200 },
-  ];
-  const maxSpend = Math.max(...monthlyData.map(d => d.amount));
+  // Derive Transactions from Orders
+  const transactions = myOrders.map(order => ({
+    id: `TXN-${order.id.split('-')[1]}`,
+    date: order.date,
+    type: 'Debit',
+    description: `Order #${order.id}`,
+    amount: -order.total,
+    status: 'Completed'
+  }));
 
   // --- HANDLERS ---
   const handleAvatarClick = () => fileInputRef.current?.click();
@@ -105,271 +104,25 @@ export const Account: React.FC = () => {
     }
   };
 
-  // --- SUB-COMPONENTS ---
-  
-  const DashboardView = () => (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-          <div className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Total Orders</div>
-          <div className="text-2xl font-extrabold text-gray-900">{orders.length}</div>
-          <div className="text-xs text-green-600 font-bold mt-2 flex items-center gap-1"><TrendingUp size={12}/> +2 this month</div>
-        </div>
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-          <div className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Total Spent</div>
-          <div className="text-2xl font-extrabold text-gray-900">₹{totalSpent.toLocaleString()}</div>
-          <div className="text-xs text-gray-400 font-bold mt-2">Lifetime</div>
-        </div>
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-          <div className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Credit Points</div>
-          <div className="text-2xl font-extrabold text-amber-500">{creditPoints}</div>
-          <div className="text-xs text-leaf-600 font-bold mt-2">Use at checkout</div>
-        </div>
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-          <div className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Active</div>
-          <div className="text-2xl font-extrabold text-gray-900">{activeOrders}</div>
-          <div className="text-xs text-orange-500 font-bold mt-2">In transit</div>
-        </div>
-      </div>
+  const handleCreateTicket = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ticketSubject || !ticketMessage) return;
+    
+    // 1. Create Ticket Locally
+    const ticketId = createSupportTicket(ticketSubject, ticketMessage);
+    
+    // 2. Send to WhatsApp
+    const waMessage = `*New Support Ticket*\n\n*Ticket ID:* ${ticketId}\n*User:* ${user.name} (${user.phone})\n*Subject:* ${ticketSubject}\n*Issue:* ${ticketMessage}`;
+    const url = `https://wa.me/918513028892?text=${encodeURIComponent(waMessage)}`;
+    window.open(url, '_blank');
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-            <DollarSign className="text-leaf-600" size={20}/> Spending Overview
-          </h3>
-          <div className="flex items-end justify-between h-48 gap-2">
-            {monthlyData.map((data, idx) => (
-              <div key={idx} className="flex flex-col items-center gap-2 flex-1 group cursor-pointer">
-                <div 
-                  className="w-full bg-leaf-100 rounded-t-lg relative group-hover:bg-leaf-500 transition-all duration-300"
-                  style={{ height: `${(data.amount / maxSpend) * 100}%` }}
-                >
-                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                    ₹{data.amount}
-                  </div>
-                </div>
-                <span className="text-xs font-bold text-gray-400">{data.month}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+    addToast('Redirecting to WhatsApp to send report...', 'success');
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <div className="flex justify-between items-center mb-6">
-             <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-               <Bell className="text-leaf-600" size={20}/> Alerts
-             </h3>
-             <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold">{notifications.filter(n=>!n.read).length} New</span>
-          </div>
-          <div className="space-y-4">
-            {notifications.slice(0, 3).map(n => (
-              <div key={n.id} className="flex gap-3 p-3 bg-leaf-50 rounded-xl border border-leaf-100">
-                 <div className="w-2 h-2 mt-1.5 bg-leaf-500 rounded-full shrink-0"></div>
-                 <div>
-                   <p className="text-sm font-bold text-gray-800">{n.title}</p>
-                   <p className="text-xs text-gray-500">{n.message}</p>
-                 </div>
-              </div>
-            ))}
-            {notifications.length === 0 && <p className="text-xs text-gray-400">No new notifications</p>}
-          </div>
-        </div>
-      </div>
-      
-      {/* Referral Section */}
-      <div className="bg-gradient-to-r from-purple-500 to-purple-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
-         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-         <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-            <div>
-               <h3 className="text-xl font-bold mb-2">Refer & Earn ₹100 Credits</h3>
-               <p className="text-purple-100 text-sm max-w-md">Share your unique code with friends. They get 50 bonus points, and you get 100 points when they order!</p>
-            </div>
-            <div className="bg-white/20 backdrop-blur-md p-4 rounded-xl border border-white/20 flex flex-col items-center">
-               <p className="text-xs font-bold uppercase tracking-widest text-purple-200 mb-1">Your Code</p>
-               <div className="flex items-center gap-3">
-                  <span className="text-2xl font-mono font-bold">{user.referralCode || 'GENERATE'}</span>
-                  <button onClick={copyReferralCode} className="p-2 hover:bg-white/20 rounded-lg transition"><Copy size={18}/></button>
-               </div>
-            </div>
-         </div>
-      </div>
-    </div>
-  );
-
-  const AddressesView = () => (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center">
-        <h3 className="text-xl font-bold text-gray-900">Saved Addresses</h3>
-        <button onClick={() => setIsEditingAddress(true)} className="bg-leaf-600 text-white px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-leaf-700 transition">
-          <Plus size={16} /> Add New
-        </button>
-      </div>
-
-      {isEditingAddress && (
-        <form onSubmit={handleAddAddress} className="bg-gray-50 p-6 rounded-2xl border border-gray-200 mb-6">
-           <h4 className="font-bold text-gray-900 mb-4">Add New Address</h4>
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-             <select 
-              value={newAddress.type} 
-              onChange={e => setNewAddress({...newAddress, type: e.target.value})}
-              className="p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-leaf-500"
-             >
-               <option>Home</option>
-               <option>Work</option>
-               <option>Other</option>
-             </select>
-             <input 
-              type="text" 
-              placeholder="Full Address (House, Street, City, Zip)" 
-              className="md:col-span-2 p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-leaf-500"
-              value={newAddress.text}
-              onChange={e => setNewAddress({...newAddress, text: e.target.value})}
-              required
-             />
-           </div>
-           <div className="flex justify-end gap-3">
-             <button type="button" onClick={() => setIsEditingAddress(false)} className="px-4 py-2 text-gray-500 font-bold hover:text-gray-700">Cancel</button>
-             <button type="submit" className="bg-gray-900 text-white px-6 py-2 rounded-xl font-bold hover:bg-gray-800">Save Address</button>
-           </div>
-        </form>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {addresses.map(addr => (
-          <div key={addr.id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:border-leaf-300 transition relative group">
-             <div className="flex items-start justify-between mb-2">
-               <div className="flex items-center gap-2">
-                 <span className="bg-gray-100 text-gray-700 text-xs font-bold px-2 py-1 rounded uppercase">{addr.type}</span>
-                 {addr.isDefault && <span className="text-leaf-600 text-xs font-bold flex items-center gap-1"><Check size={12}/> Default</span>}
-               </div>
-               <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                 <button className="text-gray-400 hover:text-blue-500"><Edit2 size={16}/></button>
-                 {!addr.isDefault && <button onClick={() => handleDeleteAddress(addr.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={16}/></button>}
-               </div>
-             </div>
-             <p className="text-gray-600 text-sm leading-relaxed">{addr.text}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  const WalletView = () => (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-8 text-white flex flex-col justify-between shadow-xl min-h-[180px]">
-            <div>
-            <p className="text-gray-400 text-sm font-medium mb-1 flex items-center gap-2"><Wallet size={16}/> Wallet Balance</p>
-            <h2 className="text-4xl font-extrabold">₹{walletBalance.toLocaleString('en-IN')}</h2>
-            </div>
-            <div className="mt-4">
-            <button className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-6 py-2 rounded-xl font-bold transition text-sm">Add Money</button>
-            </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-8 text-white flex flex-col justify-between shadow-xl min-h-[180px]">
-            <div>
-            <p className="text-amber-100 text-sm font-medium mb-1 flex items-center gap-2"><Coins size={16}/> Credit Points</p>
-            <h2 className="text-4xl font-extrabold">{creditPoints} Pts</h2>
-            <p className="text-xs text-amber-100 mt-1">1 Point = ₹1. Earn 5% on every order.</p>
-            </div>
-            <div className="mt-4">
-            <button onClick={() => navigate('/shop')} className="bg-white text-orange-600 hover:bg-orange-50 px-6 py-2 rounded-xl font-bold transition text-sm shadow-sm">Redeem Now</button>
-            </div>
-        </div>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Saved Cards */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-           <div className="flex justify-between items-center mb-6">
-             <h3 className="font-bold text-gray-900">Saved Cards</h3>
-             <button onClick={() => setIsAddingCard(true)} className="text-leaf-600 text-xs font-bold hover:underline">+ Add Card</button>
-           </div>
-           
-           {isAddingCard && (
-             <form onSubmit={handleAddCard} className="mb-6 bg-gray-50 p-4 rounded-xl">
-               <input 
-                 className="w-full mb-2 p-2 rounded border" 
-                 placeholder="Card Number" 
-                 value={newCard.number} 
-                 maxLength={16} 
-                 onChange={e=>setNewCard({...newCard, number: e.target.value})} 
-               />
-               <div className="flex gap-2">
-                 <input className="flex-1 p-2 rounded border" placeholder="Name" value={newCard.name} onChange={e=>setNewCard({...newCard, name: e.target.value})} />
-                 <input className="w-24 p-2 rounded border" placeholder="MM/YY" value={newCard.expiry} onChange={e=>setNewCard({...newCard, expiry: e.target.value})} />
-               </div>
-               <div className="flex gap-2 mt-2">
-                 <button type="submit" className="bg-gray-900 text-white text-xs font-bold px-3 py-1.5 rounded">Save</button>
-                 <button onClick={()=>setIsAddingCard(false)} type="button" className="text-gray-500 text-xs font-bold px-3 py-1.5">Cancel</button>
-               </div>
-             </form>
-           )}
-
-           <div className="space-y-3">
-             {(user.savedCards || []).map(card => (
-               <div key={card.id} className="flex justify-between items-center p-3 border rounded-xl hover:bg-gray-50 group">
-                 <div className="flex items-center gap-3">
-                   <CreditCard size={20} className="text-gray-400"/>
-                   <div>
-                     <p className="text-sm font-bold text-gray-800">{card.brand} •••• {card.last4}</p>
-                     <p className="text-xs text-gray-500">Expires {card.expiry}</p>
-                   </div>
-                 </div>
-                 <button onClick={() => removeSavedCard(card.id)} className="text-red-400 opacity-0 group-hover:opacity-100"><Trash2 size={16}/></button>
-               </div>
-             ))}
-             {(user.savedCards || []).length === 0 && <p className="text-sm text-gray-400">No saved cards.</p>}
-           </div>
-        </div>
-
-        {/* Transactions */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-            <h3 className="font-bold text-gray-900">Transaction History</h3>
-            <button className="text-leaf-600 text-sm font-bold hover:underline">Full Statement</button>
-          </div>
-          <div className="max-h-64 overflow-y-auto">
-            <table className="w-full text-left">
-              <tbody className="divide-y divide-gray-100">
-                {TRANSACTIONS.map((txn) => (
-                  <tr key={txn.id} className="hover:bg-gray-50/50 transition">
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-medium text-gray-900">{txn.description}</p>
-                      <p className="text-xs text-gray-500">{txn.date}</p>
-                    </td>
-                    <td className={`px-6 py-4 text-right font-bold text-sm ${txn.type === 'Credit' ? 'text-green-600' : 'text-gray-900'}`}>
-                      {txn.type === 'Credit' ? '+' : ''}₹{Math.abs(txn.amount)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const SupportView = () => (
-    <div className="space-y-6 animate-in fade-in duration-500">
-        <div className="flex justify-between items-center">
-            <h3 className="text-xl font-bold text-gray-900">Support Tickets</h3>
-            <button className="bg-leaf-600 text-white px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-leaf-700 transition">
-            <Plus size={16} /> New Ticket
-            </button>
-        </div>
-        
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-6 text-center text-gray-500">
-                <MessageSquare size={48} className="mx-auto text-gray-300 mb-4" />
-                <p>No active support tickets.</p>
-                <p className="text-xs">Need help? Create a ticket and we'll respond within 24h.</p>
-            </div>
-        </div>
-    </div>
-  );
+    // 3. Reset UI
+    setTicketSubject('');
+    setTicketMessage('');
+    setIsCreatingTicket(false);
+  };
 
   return (
     <div className="bg-gray-50 min-h-screen py-10">
@@ -438,10 +191,306 @@ export const Account: React.FC = () => {
           </div>
 
           <div className="lg:col-span-9">
-             {activeTab === 'dashboard' && <DashboardView />}
-             {activeTab === 'addresses' && <AddressesView />}
-             {activeTab === 'wallet' && <WalletView />}
-             {activeTab === 'support' && <SupportView />}
+             {activeTab === 'dashboard' && (
+                <div className="space-y-6 animate-in fade-in duration-500">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                      <div className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Total Orders</div>
+                      <div className="text-2xl font-extrabold text-gray-900">{myOrders.length}</div>
+                      <div className="text-xs text-green-600 font-bold mt-2 flex items-center gap-1"><TrendingUp size={12}/> Lifetime</div>
+                    </div>
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                      <div className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Total Spent</div>
+                      <div className="text-2xl font-extrabold text-gray-900">₹{totalSpent.toLocaleString()}</div>
+                      <div className="text-xs text-gray-400 font-bold mt-2">Lifetime</div>
+                    </div>
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                      <div className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Credit Points</div>
+                      <div className="text-2xl font-extrabold text-amber-500">{creditPoints}</div>
+                      <div className="text-xs text-leaf-600 font-bold mt-2">Use at checkout</div>
+                    </div>
+                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                      <div className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Active</div>
+                      <div className="text-2xl font-extrabold text-gray-900">{activeOrders}</div>
+                      <div className="text-xs text-orange-500 font-bold mt-2">In transit</div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                      <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+                        <Bell className="text-leaf-600" size={20}/> Alerts
+                      </h3>
+                      <div className="space-y-4">
+                        {notifications.slice(0, 3).map(n => (
+                          <div key={n.id} className="flex gap-3 p-3 bg-leaf-50 rounded-xl border border-leaf-100">
+                             <div className="w-2 h-2 mt-1.5 bg-leaf-500 rounded-full shrink-0"></div>
+                             <div>
+                               <p className="text-sm font-bold text-gray-800">{n.title}</p>
+                               <p className="text-xs text-gray-500">{n.message}</p>
+                             </div>
+                          </div>
+                        ))}
+                        {notifications.length === 0 && (
+                            <div className="text-center py-8">
+                                <p className="text-gray-400 text-sm">No new notifications</p>
+                            </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-purple-500 to-purple-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden flex flex-col justify-center">
+                       <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                       <div className="relative z-10">
+                           <h3 className="text-xl font-bold mb-2">Refer & Earn</h3>
+                           <p className="text-purple-100 text-sm mb-6">Share your unique code. Earn 50 points per referral!</p>
+                           <div className="bg-white/20 backdrop-blur-md p-3 rounded-xl border border-white/20 flex items-center justify-between">
+                              <span className="font-mono font-bold tracking-wider">{user.referralCode || 'GENERATE'}</span>
+                              <button onClick={copyReferralCode} className="p-2 hover:bg-white/20 rounded-lg transition"><Copy size={16}/></button>
+                           </div>
+                       </div>
+                    </div>
+                  </div>
+                </div>
+             )}
+
+             {activeTab === 'addresses' && (
+                <div className="space-y-6 animate-in fade-in duration-500">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-xl font-bold text-gray-900">Saved Addresses</h3>
+                    <button onClick={() => setIsEditingAddress(true)} className="bg-leaf-600 text-white px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-leaf-700 transition">
+                      <Plus size={16} /> Add New
+                    </button>
+                  </div>
+
+                  {isEditingAddress && (
+                    <form onSubmit={handleAddAddress} className="bg-gray-50 p-6 rounded-2xl border border-gray-200 mb-6">
+                       <h4 className="font-bold text-gray-900 mb-4">Add New Address</h4>
+                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                         <select 
+                          value={newAddress.type} 
+                          onChange={e => setNewAddress({...newAddress, type: e.target.value})}
+                          className="p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-leaf-500"
+                         >
+                           <option>Home</option>
+                           <option>Work</option>
+                           <option>Other</option>
+                         </select>
+                         <input 
+                          type="text" 
+                          placeholder="Full Address (House, Street, City, Zip)" 
+                          className="md:col-span-2 p-3 rounded-xl border border-gray-300 focus:outline-none focus:border-leaf-500"
+                          value={newAddress.text}
+                          onChange={e => setNewAddress({...newAddress, text: e.target.value})}
+                          required
+                         />
+                       </div>
+                       <div className="flex justify-end gap-3">
+                         <button type="button" onClick={() => setIsEditingAddress(false)} className="px-4 py-2 text-gray-500 font-bold hover:text-gray-700">Cancel</button>
+                         <button type="submit" className="bg-gray-900 text-white px-6 py-2 rounded-xl font-bold hover:bg-gray-800">Save Address</button>
+                       </div>
+                    </form>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {addresses.map(addr => (
+                      <div key={addr.id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:border-leaf-300 transition relative group">
+                         <div className="flex items-start justify-between mb-2">
+                           <div className="flex items-center gap-2">
+                             <span className="bg-gray-100 text-gray-700 text-xs font-bold px-2 py-1 rounded uppercase">{addr.type}</span>
+                             {addr.isDefault && <span className="text-leaf-600 text-xs font-bold flex items-center gap-1"><Check size={12}/> Default</span>}
+                           </div>
+                           <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                             <button className="text-gray-400 hover:text-blue-500"><Edit2 size={16}/></button>
+                             {!addr.isDefault && <button onClick={() => handleDeleteAddress(addr.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={16}/></button>}
+                           </div>
+                         </div>
+                         <p className="text-gray-600 text-sm leading-relaxed">{addr.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+             )}
+
+             {activeTab === 'wallet' && (
+                <div className="space-y-6 animate-in fade-in duration-500">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-8 text-white flex flex-col justify-between shadow-xl min-h-[180px]">
+                        <div>
+                        <p className="text-gray-400 text-sm font-medium mb-1 flex items-center gap-2"><Wallet size={16}/> Wallet Balance</p>
+                        <h2 className="text-4xl font-extrabold">₹{walletBalance.toLocaleString('en-IN')}</h2>
+                        </div>
+                        <div className="mt-4">
+                        <button className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-6 py-2 rounded-xl font-bold transition text-sm">Add Money</button>
+                        </div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-8 text-white flex flex-col justify-between shadow-xl min-h-[180px]">
+                        <div>
+                        <p className="text-amber-100 text-sm font-medium mb-1 flex items-center gap-2"><Coins size={16}/> Credit Points</p>
+                        <h2 className="text-4xl font-extrabold">{creditPoints} Pts</h2>
+                        <p className="text-xs text-amber-100 mt-1">1 Point = ₹1. Earn 5% on every order.</p>
+                        </div>
+                        <div className="mt-4">
+                        <button onClick={() => navigate('/shop')} className="bg-white text-orange-600 hover:bg-orange-50 px-6 py-2 rounded-xl font-bold transition text-sm shadow-sm">Redeem Now</button>
+                        </div>
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {/* Saved Cards */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                       <div className="flex justify-between items-center mb-6">
+                         <h3 className="font-bold text-gray-900">Saved Cards</h3>
+                         <button onClick={() => setIsAddingCard(true)} className="text-leaf-600 text-xs font-bold hover:underline">+ Add Card</button>
+                       </div>
+                       
+                       {isAddingCard && (
+                         <form onSubmit={handleAddCard} className="mb-6 bg-gray-50 p-4 rounded-xl">
+                           <input 
+                             className="w-full mb-2 p-2 rounded border" 
+                             placeholder="Card Number" 
+                             value={newCard.number} 
+                             maxLength={16} 
+                             onChange={e=>setNewCard({...newCard, number: e.target.value})} 
+                           />
+                           <div className="flex gap-2">
+                             <input className="flex-1 p-2 rounded border" placeholder="Name" value={newCard.name} onChange={e=>setNewCard({...newCard, name: e.target.value})} />
+                             <input className="w-24 p-2 rounded border" placeholder="MM/YY" value={newCard.expiry} onChange={e=>setNewCard({...newCard, expiry: e.target.value})} />
+                           </div>
+                           <div className="flex gap-2 mt-2">
+                             <button type="submit" className="bg-gray-900 text-white text-xs font-bold px-3 py-1.5 rounded">Save</button>
+                             <button onClick={()=>setIsAddingCard(false)} type="button" className="text-gray-500 text-xs font-bold px-3 py-1.5">Cancel</button>
+                           </div>
+                         </form>
+                       )}
+
+                       <div className="space-y-3">
+                         {(user.savedCards || []).map(card => (
+                           <div key={card.id} className="flex justify-between items-center p-3 border rounded-xl hover:bg-gray-50 group">
+                             <div className="flex items-center gap-3">
+                               <CreditCard size={20} className="text-gray-400"/>
+                               <div>
+                                 <p className="text-sm font-bold text-gray-800">{card.brand} •••• {card.last4}</p>
+                                 <p className="text-xs text-gray-500">Expires {card.expiry}</p>
+                               </div>
+                             </div>
+                             <button onClick={() => removeSavedCard(card.id)} className="text-red-400 opacity-0 group-hover:opacity-100"><Trash2 size={16}/></button>
+                           </div>
+                         ))}
+                         {(user.savedCards || []).length === 0 && <p className="text-sm text-gray-400">No saved cards.</p>}
+                       </div>
+                    </div>
+
+                    {/* Transactions (Derived from Orders) */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                      <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                        <h3 className="font-bold text-gray-900">Transaction History</h3>
+                      </div>
+                      <div className="max-h-64 overflow-y-auto">
+                        {transactions.length > 0 ? (
+                            <table className="w-full text-left">
+                            <tbody className="divide-y divide-gray-100">
+                                {transactions.map((txn) => (
+                                <tr key={txn.id} className="hover:bg-gray-50/50 transition">
+                                    <td className="px-6 py-4">
+                                    <p className="text-sm font-medium text-gray-900">{txn.description}</p>
+                                    <p className="text-xs text-gray-500">{txn.date}</p>
+                                    </td>
+                                    <td className={`px-6 py-4 text-right font-bold text-sm ${txn.amount > 0 ? 'text-green-600' : 'text-gray-900'}`}>
+                                    {txn.amount > 0 ? '+' : ''}₹{Math.abs(txn.amount)}
+                                    </td>
+                                </tr>
+                                ))}
+                            </tbody>
+                            </table>
+                        ) : (
+                            <div className="p-8 text-center text-gray-400 text-sm">
+                                <p>No transactions yet.</p>
+                            </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+             )}
+
+             {activeTab === 'support' && (
+                <div className="space-y-6 animate-in fade-in duration-500">
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-xl font-bold text-gray-900">Support Tickets</h3>
+                        <button 
+                            onClick={() => setIsCreatingTicket(true)}
+                            className="bg-leaf-600 text-white px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-leaf-700 transition"
+                        >
+                            <Plus size={16} /> New Ticket
+                        </button>
+                    </div>
+                    
+                    {isCreatingTicket && (
+                        <form onSubmit={handleCreateTicket} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-6">
+                            <h4 className="font-bold text-gray-900 mb-4">Create New Ticket</h4>
+                            <div className="mb-4">
+                                <label className="block text-sm font-bold text-gray-700 mb-2">Subject</label>
+                                <select 
+                                    value={ticketSubject} 
+                                    onChange={(e) => setTicketSubject(e.target.value)}
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-leaf-500"
+                                    required
+                                >
+                                    <option value="">Select Issue Type</option>
+                                    <option value="Order Issue">Order Issue</option>
+                                    <option value="Payment Issue">Payment Issue</option>
+                                    <option value="Product Quality">Product Quality</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div className="mb-4">
+                                <label className="block text-sm font-bold text-gray-700 mb-2">Message</label>
+                                <textarea 
+                                    value={ticketMessage}
+                                    onChange={(e) => setTicketMessage(e.target.value)}
+                                    rows={4}
+                                    placeholder="Describe your issue..."
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-leaf-500"
+                                    required
+                                />
+                            </div>
+                            <div className="flex justify-end gap-3">
+                                <button type="button" onClick={() => setIsCreatingTicket(false)} className="px-4 py-2 text-gray-500 font-bold hover:text-gray-700">Cancel</button>
+                                <button type="submit" className="bg-gray-900 text-white px-6 py-2 rounded-xl font-bold hover:bg-gray-800 flex items-center gap-2">
+                                    <Send size={16}/> Submit & WhatsApp
+                                </button>
+                            </div>
+                        </form>
+                    )}
+
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                        {(user.tickets && user.tickets.length > 0) ? (
+                            <div className="divide-y divide-gray-100">
+                                {user.tickets.map((ticket) => (
+                                    <div key={ticket.id} className="p-6 hover:bg-gray-50 transition">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <h4 className="font-bold text-gray-900">{ticket.subject}</h4>
+                                            <span className={`text-xs font-bold px-2 py-1 rounded ${ticket.status === 'Open' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                                                {ticket.status}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-gray-500">Ticket ID: {ticket.id} • Created: {ticket.date}</p>
+                                        <p className="text-xs text-gray-400 mt-1">Last Update: {ticket.lastUpdate}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="p-10 text-center text-gray-500">
+                                <MessageSquare size={48} className="mx-auto text-gray-300 mb-4" />
+                                <p>No tickets found.</p>
+                                <p className="text-xs">Need help? Create a ticket and we'll respond within 24h.</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+             )}
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, SavedCard, UserNotification } from '../types';
+import { User, SavedCard, UserNotification, SupportTicket } from '../types';
 import { useToast } from './ToastContext';
 
 interface AuthContextType {
@@ -20,13 +20,14 @@ interface AuthContextType {
   removeSavedCard: (id: string) => void;
   notifications: UserNotification[];
   markNotificationRead: (id: string) => void;
+  createSupportTicket: (subject: string, message: string) => string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// SIMULATED BACKEND STORAGE KEY
-const DB_USERS_KEY = 'freshleaf_db_users';
-const DB_SESSION_KEY = 'freshleaf_session_user';
+// KEYS
+const DB_USERS_KEY = 'freshleaf_db_users_prod'; 
+const DB_SESSION_KEY = 'freshleaf_session_user_prod';
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -35,32 +36,72 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
   const { addToast } = useToast();
 
-  // Load user session on mount
+  // --- PERSISTENCE LOGIC ---
+  // Load user session on mount, syncing with the "Main DB" to ensure data integrity
   useEffect(() => {
-    const session = localStorage.getItem(DB_SESSION_KEY);
-    if (session) {
-      const parsedUser = JSON.parse(session);
-      setUser(parsedUser);
-      setWalletBalance(parsedUser.walletBalance || 0);
-      setCreditPoints(parsedUser.creditPoints || 0);
-      setNotifications(parsedUser.notifications || []);
-    }
+    const checkSession = () => {
+      const sessionData = localStorage.getItem(DB_SESSION_KEY);
+      
+      if (sessionData) {
+        try {
+          const parsedSession = JSON.parse(sessionData);
+          const userId = parsedSession.id;
+
+          // FETCH LATEST DATA FROM "DATABASE"
+          // This ensures that if the user had updates in a different tab or previous session, 
+          // we load the absolute latest state, not just what was in the session cookie.
+          const allUsers = JSON.parse(localStorage.getItem(DB_USERS_KEY) || '[]');
+          const dbUser = allUsers.find((u: User) => u.id === userId);
+
+          if (dbUser) {
+            // Found in DB -> Source of Truth
+            setUser(dbUser);
+            setWalletBalance(dbUser.walletBalance || 0);
+            setCreditPoints(dbUser.creditPoints || 0);
+            setNotifications(dbUser.notifications || []);
+            // Update session to match DB perfect state
+            localStorage.setItem(DB_SESSION_KEY, JSON.stringify(dbUser));
+          } else {
+            // User exists in session but not DB (Corruption/Deletion) -> Logout
+            console.warn("Session found but user missing in DB. Logging out.");
+            logout();
+          }
+        } catch (e) {
+          console.error("Session parse error", e);
+          logout();
+        }
+      }
+    };
+
+    checkSession();
+    
+    // Optional: Listen for storage events to sync tabs
+    window.addEventListener('storage', checkSession);
+    return () => window.removeEventListener('storage', checkSession);
   }, []);
 
+  // --- CORE FUNCTIONS ---
+
   const saveUserSession = (userData: User) => {
+    // 1. Update State
     setUser(userData);
     setWalletBalance(userData.walletBalance || 0);
     setCreditPoints(userData.creditPoints || 0);
+    setNotifications(userData.notifications || []);
+    
+    // 2. Update Session Storage (Persistence)
     localStorage.setItem(DB_SESSION_KEY, JSON.stringify(userData));
     
-    // Update "Database"
+    // 3. Update "Main Database" (Long-term Storage)
     const users = JSON.parse(localStorage.getItem(DB_USERS_KEY) || '[]');
-    const index = users.findIndex((u: User) => u.email === userData.email);
+    const index = users.findIndex((u: User) => u.id === userData.id);
+    
     if (index >= 0) {
       users[index] = { ...users[index], ...userData };
     } else {
       users.push(userData);
     }
+    
     localStorage.setItem(DB_USERS_KEY, JSON.stringify(users));
   };
 
@@ -71,44 +112,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const sendOTP = async (phone: string) => {
-    // Simulate API Call delay
     await new Promise(resolve => setTimeout(resolve, 1500));
     const otp = Math.floor(1000 + Math.random() * 9000).toString();
     console.log(`%c[SMS Gateway] OTP for ${phone}: ${otp}`, 'color: yellow; font-size: 14px; font-weight: bold;');
-    addToast(`OTP Sent to ${phone}: ${otp}`, 'info'); // Showing in toast for demo
+    addToast(`OTP Sent to ${phone}: ${otp}`, 'info'); 
     return true;
-  };
-
-  const sendWelcomeNotifications = (name: string, email: string, phone: string) => {
-    // Simulate Email Service
-    setTimeout(() => {
-        const emailContent = `Subject: Welcome to FreshLeaf! 🌿\n\nHi ${name},\n\nThank you for joining the FreshLeaf family. Your wallet has been activated.\n\nUse code WELCOME10 for 10% off your first order.\n\nHappy Shopping,\nTeam FreshLeaf`;
-        console.log(`%c[Email Service] Sent to ${email}:`, 'color: green; font-weight: bold;', emailContent);
-        addToast(`Welcome email sent to ${email}`, 'success');
-    }, 1500);
-
-    // Simulate SMS Service
-    setTimeout(() => {
-        const smsContent = `FreshLeaf: Hi ${name}! Your account is active. Order fresh veggies now.`;
-        console.log(`%c[SMS Gateway] Sent to ${phone}:`, 'color: orange; font-weight: bold;', smsContent);
-    }, 3000);
   };
 
   const loginWithOTP = async (phone: string, otp: string) => {
     await new Promise(resolve => setTimeout(resolve, 1000));
-    // In a real app, verify OTP against backend
+    
     if (otp.length === 4) { 
         const users = JSON.parse(localStorage.getItem(DB_USERS_KEY) || '[]');
         let existingUser = users.find((u: User) => u.phone === phone);
         
-        let isNewUser = false;
+        // Register new user if not exists
         if (!existingUser) {
-             isNewUser = true;
              const name = 'Guest User';
              existingUser = {
                 id: 'usr_' + Math.random().toString(36).substr(2, 9),
                 name: name,
-                email: `${phone}@mobile.user`,
+                email: `${phone}@mobile.freshleaf`,
                 phone: phone,
                 isPro: false,
                 avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${phone}`,
@@ -116,19 +140,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 creditPoints: 0,
                 referralCode: generateReferralCode(name),
                 savedCards: [],
-                notifications: [
-                  { id: 'n1', title: 'Welcome!', message: 'Thanks for joining FreshLeaf.', date: new Date().toDateString(), read: false, type: 'system' }
-                ]
+                notifications: [],
+                tickets: []
              };
+             // Ensure it's added to users array immediately for consistency
+             users.push(existingUser);
+             localStorage.setItem(DB_USERS_KEY, JSON.stringify(users));
+             addToast('Account created successfully', 'success');
         }
         
         saveUserSession(existingUser);
-        
-        if (isNewUser) {
-            sendWelcomeNotifications('Guest', existingUser.email, phone);
-        } else {
-            addToast('Logged in successfully', 'success');
-        }
+        addToast('Logged in successfully', 'success');
         return true;
     }
     addToast('Invalid OTP', 'error');
@@ -154,17 +176,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             isPro: true,
             isAdmin: true,
             avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Admin',
-            walletBalance: 99999,
-            creditPoints: 9999,
+            walletBalance: 0,
+            creditPoints: 0,
             referralCode: 'ADMIN001',
-            notifications: []
+            notifications: [],
+            tickets: []
          };
          saveUserSession(adminUser);
          addToast('Admin access granted', 'warning');
          return true;
       }
 
-      addToast('User not found. Check credentials.', 'error');
+      addToast('User not found. Please Sign Up.', 'error');
       return false;
     }
   };
@@ -172,7 +195,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signup = async (name: string, email: string, phone: string, password: string, referralCode?: string) => {
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // Check if user exists
     const users = JSON.parse(localStorage.getItem(DB_USERS_KEY) || '[]');
     if (users.find((u: User) => u.email === email)) {
         addToast('Email already registered', 'error');
@@ -186,24 +208,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (referralCode) {
         const referrer = users.find((u: User) => u.referralCode === referralCode);
         if (referrer) {
-            welcomePoints = 50; // Bonus for new user
+            welcomePoints = 25; // Bonus for new user
             referredBy = referralCode;
             
-            // Reward Referrer (Update DB directly)
-            referrer.creditPoints = (referrer.creditPoints || 0) + 100;
-            referrer.notifications.push({
-                id: Date.now().toString(),
-                title: 'Referral Reward!',
-                message: `You earned 100 points because ${name} used your code.`,
-                date: new Date().toDateString(),
-                read: false,
-                type: 'promo'
-            });
-            // Save referrer updates back to DB array
+            // Reward Referrer
+            referrer.creditPoints = (referrer.creditPoints || 0) + 50;
+            referrer.notifications = [
+                ...(referrer.notifications || []), 
+                {
+                    id: Date.now().toString(),
+                    title: 'Referral Reward!',
+                    message: `You earned 50 points because ${name} used your code.`,
+                    date: new Date().toDateString(),
+                    read: false,
+                    type: 'promo'
+                }
+            ];
+            
+            // Save referrer updates immediately to DB
             const refIndex = users.findIndex((u: User) => u.id === referrer.id);
             if (refIndex !== -1) users[refIndex] = referrer;
-            
-            console.log(`Referral applied: ${referralCode}. Referrer awarded.`);
+            // Note: We don't save users array to LS here, we do it in saveUserSession below which handles the new user push
         }
     }
 
@@ -214,27 +239,29 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       phone,
       isPro: false,
       avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
-      walletBalance: 0, // Realistic start
+      walletBalance: 0, 
       creditPoints: welcomePoints,
       referralCode: generateReferralCode(name),
       referredBy,
       savedCards: [],
       notifications: [
          { id: 'n1', title: 'Welcome!', message: 'Thanks for joining FreshLeaf.', date: new Date().toDateString(), read: false, type: 'system' }
-      ]
+      ],
+      tickets: []
     };
     
-    // Update local session
+    // This function will push newUser to DB and also save any referrer updates because we read/write the full array
     saveUserSession(newUser);
     
-    // Trigger Welcome Messages
-    sendWelcomeNotifications(name, email, phone);
-    
+    addToast('Account created! Welcome to FreshLeaf.', 'success');
     return true;
   };
 
   const logout = () => {
     setUser(null);
+    setWalletBalance(0);
+    setCreditPoints(0);
+    setNotifications([]);
     localStorage.removeItem(DB_SESSION_KEY);
     addToast('Logged out successfully', 'info');
   };
@@ -254,7 +281,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const addToWallet = (amount: number) => {
     if(!user) return;
     const newBalance = (user.walletBalance || 0) + amount;
-    setWalletBalance(newBalance);
     updateProfile({ walletBalance: newBalance });
     addToast(`₹${amount} added to wallet`, 'success');
   };
@@ -280,12 +306,34 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     updateProfile({ notifications: updatedNotifications });
   };
 
+  const createSupportTicket = (subject: string, message: string) => {
+    if(!user) return '';
+    const ticketId = 'TKT-' + Math.floor(1000 + Math.random() * 9000);
+    const newTicket: SupportTicket = {
+        id: ticketId,
+        subject,
+        status: 'Open',
+        date: new Date().toLocaleDateString(),
+        lastUpdate: 'Just now'
+    };
+    
+    // Get latest user state to ensure we append to current tickets
+    const currentTickets = user.tickets || [];
+    const updatedTickets = [newTicket, ...currentTickets];
+    
+    updateProfile({ tickets: updatedTickets });
+    
+    console.log(`[Support System] New Ticket from ${user.email}: ${subject} - ${message}`);
+    return ticketId;
+  };
+
   return (
     <AuthContext.Provider value={{ 
         user, login, signup, logout, updateProfile, joinMembership, 
         isAuthenticated: !!user, sendOTP, loginWithOTP, 
         walletBalance, creditPoints, addToWallet,
-        addSavedCard, removeSavedCard, notifications: user?.notifications || [], markNotificationRead
+        addSavedCard, removeSavedCard, notifications: user?.notifications || [], markNotificationRead,
+        createSupportTicket
     }}>
       {children}
     </AuthContext.Provider>

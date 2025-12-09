@@ -1,7 +1,7 @@
 
 import React, { useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, Truck, Package, Calendar, Download, MessageCircle, ArrowRight } from 'lucide-react';
+import { CheckCircle, Truck, Package, Calendar, Download, MessageCircle, ArrowRight, Loader2 } from 'lucide-react';
 import { useOrder } from '../services/OrderContext';
 import { COMPANY_INFO } from '../constants';
 
@@ -12,6 +12,16 @@ export const OrderConfirmation: React.FC = () => {
   const navigate = useNavigate();
 
   const order = getOrderById(orderId || '');
+
+  // Auto-Redirect to WhatsApp logic
+  useEffect(() => {
+    if (order) {
+        const timer = setTimeout(() => {
+            handleWhatsAppShare();
+        }, 3000); // 3-second delay to let user see confirmation
+        return () => clearTimeout(timer);
+    }
+  }, [order]);
 
   useEffect(() => {
     if (!orderId) {
@@ -33,7 +43,7 @@ Items: ${order.items.map(i => `${i.name.en} (${i.quantity})`).join(', ')}
 Please confirm the delivery time.`;
 
     const url = `https://wa.me/${COMPANY_INFO.whatsapp}?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank');
+    window.location.href = url; // Auto redirect
   };
 
   return (
@@ -52,6 +62,12 @@ Please confirm the delivery time.`;
         <p className="text-lg font-bold text-gray-800 bg-gray-50 inline-block px-4 py-2 rounded-lg mb-8 border border-gray-200">
            Order ID: {order.id}
         </p>
+        
+        {/* Auto Redirect Notice */}
+        <div className="mb-6 flex items-center justify-center gap-2 text-sm text-green-600 bg-green-50 p-2 rounded-lg animate-pulse">
+            <Loader2 size={16} className="animate-spin" /> 
+            Redirecting to WhatsApp for final confirmation...
+        </div>
         
         {/* Feature Section (Order Steps) */}
         <div className="space-y-4 mb-8 text-left bg-gray-50 p-6 rounded-xl border border-gray-100">
@@ -90,7 +106,7 @@ Please confirm the delivery time.`;
                 onClick={handleWhatsAppShare}
                 className="w-full flex items-center justify-center gap-2 bg-green-500 text-white py-3 rounded-xl font-bold hover:bg-green-600 transition shadow-lg shadow-green-200"
             >
-                <MessageCircle size={18} /> Confirm on WhatsApp
+                <MessageCircle size={18} /> Click here if not redirected
             </button>
         </div>
 
