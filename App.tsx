@@ -23,6 +23,7 @@ import { Settings } from './pages/Settings';
 import { Wishlist } from './pages/Wishlist';
 import { Login, Signup } from './pages/Auth';
 import { Subscription } from './pages/Subscription';
+import { Partner } from './pages/Partner';
 
 const App: React.FC = () => {
   return (
@@ -60,6 +61,9 @@ const App: React.FC = () => {
                   <Route path="careers" element={<Careers />} />
                   <Route path="referral" element={<Referral />} />
                   <Route path="help" element={<HelpCenter />} />
+                  
+                  {/* New Route for Partner */}
+                  <Route path="partner" element={<Partner />} />
                   
                   {/* Legal */}
                   <Route path="privacy" element={<PrivacyPolicy />} />

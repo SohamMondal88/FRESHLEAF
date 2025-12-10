@@ -233,22 +233,45 @@ export const OrderProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     );
     saveOrders(updatedOrders);
     
-    // Refund Points logic if needed
-    if (order.pointsRedeemed && order.pointsRedeemed > 0 && user) {
-        const refundedPoints = (creditPoints || 0) + order.pointsRedeemed;
-        // We might also want to remove pointsEarned, but let's keep it simple for now or assume points earned are pending until delivery.
-        // For this demo, let's reverse both.
-        const reversedEarned = order.pointsEarned || 0;
-        const finalBalance = refundedPoints - reversedEarned;
+    // Handle Points: Refund Redeemed & Deduct Earned
+    let pointsMsg = '';
+    if (user) {
+        let newPoints = (creditPoints || 0);
         
-        updateProfile({ creditPoints: finalBalance });
-        addToast(`Points refunded: ${order.pointsRedeemed}`, 'info');
+        // Give back points used
+        if (order.pointsRedeemed && order.pointsRedeemed > 0) {
+            newPoints += order.pointsRedeemed;
+            pointsMsg += `Refunding ${order.pointsRedeemed} used points. `;
+        }
+        
+        // Take back points earned
+        if (order.pointsEarned && order.pointsEarned > 0) {
+            newPoints -= order.pointsEarned;
+            pointsMsg += `Deducting ${order.pointsEarned} earned points.`;
+        }
+        
+        // Save new point balance
+        updateProfile({ creditPoints: Math.max(0, newPoints) });
     }
 
-    // Simulate WhatsApp Cancellation update
-    const message = `Order ${orderId} has been CANCELLED by the user.`;
-    console.log(`[WhatsApp Bot] Sending Cancellation to Company & User: ${message}`);
-    addToast('Order cancelled. Update sent to WhatsApp.', 'success');
+    // Handle Payment Refund Message
+    let refundText = "Order cancelled successfully.";
+    if (order.paymentMethod === 'online') {
+        refundText = "Order cancelled. Amount will be refunded to your source account within 3 days.";
+    }
+
+    addToast(refundText, 'info');
+    if(pointsMsg) addToast(pointsMsg, 'warning');
+
+    // WhatsApp Notification Construction
+    const waMessage = `*Order Cancelled* %0A%0AOrder ID: ${orderId}%0ACustomer: ${order.customerName}%0AReason: User Cancelled within 5 mins.%0A%0AStatus: ${order.paymentMethod === 'online' ? 'Refund Initiated (3 Days)' : 'Voided'}%0APoints: Reverted.`;
+    
+    // 1. Trigger Company Notification (via User's WhatsApp Web)
+    const companyUrl = `https://wa.me/${COMPANY_INFO.whatsapp}?text=${waMessage}`; // Already encoded in param creation or simplified here
+    window.open(companyUrl, '_blank');
+
+    // 2. Simulate User Notification
+    console.log(`[WhatsApp Bot] Message sent to User (${order.customerPhone}): Your order #${orderId} has been cancelled. ${order.paymentMethod === 'online' ? 'Refund initiated within 3 days.' : ''}`);
 
     return true;
   };

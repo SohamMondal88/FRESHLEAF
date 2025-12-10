@@ -471,7 +471,7 @@ export const Layout: React.FC = () => {
                  <li><Link to="/contact" className="hover:text-leaf-400 transition flex items-center gap-2"><ChevronRight size={14}/> Contact Us</Link></li>
                  <li><Link to="/faq" className="hover:text-leaf-400 transition flex items-center gap-2"><ChevronRight size={14}/> FAQs</Link></li>
                  <li><Link to="/orders" className="hover:text-leaf-400 transition flex items-center gap-2"><ChevronRight size={14}/> Order Tracking</Link></li>
-                 <li><Link to="/contact" className="hover:text-leaf-400 transition flex items-center gap-2"><ChevronRight size={14}/> Bulk / Wholesale</Link></li>
+                 <li><Link to="/partner" className="hover:text-leaf-400 transition flex items-center gap-2"><ChevronRight size={14}/> Bulk / Wholesale</Link></li>
                  <li><Link to="/refund-policy" className="hover:text-leaf-400 transition flex items-center gap-2"><ChevronRight size={14}/> Return & Refund</Link></li>
                  <li><Link to="/shipping-policy" className="hover:text-leaf-400 transition flex items-center gap-2"><ChevronRight size={14}/> Shipping Info</Link></li>
                  <li><Link to="/refund-policy" className="hover:text-leaf-400 transition flex items-center gap-2"><ChevronRight size={14}/> Replacement Policy</Link></li>
@@ -491,7 +491,7 @@ export const Layout: React.FC = () => {
                  <li><Link to="/cart" className="hover:text-leaf-400 transition flex items-center gap-2"><ChevronRight size={14}/> My Cart</Link></li>
                  <li><Link to="/blog" className="hover:text-leaf-400 transition flex items-center gap-2"><ChevronRight size={14}/> Blog / Recipes</Link></li>
                  <li><Link to="/shop" className="hover:text-leaf-400 transition flex items-center gap-2"><ChevronRight size={14}/> Gift Packs</Link></li>
-                 <li><Link to="/about" className="hover:text-leaf-400 transition flex items-center gap-2"><ChevronRight size={14}/> Farmer Partnership</Link></li>
+                 <li><Link to="/partner" className="hover:text-leaf-400 transition flex items-center gap-2"><ChevronRight size={14}/> Farmer Partnership</Link></li>
               </ul>
             </div>
 
